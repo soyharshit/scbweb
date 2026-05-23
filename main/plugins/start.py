@@ -362,9 +362,21 @@ async def help_handler(event):
         link_preview=False)
 
 
+PREMIUM_TEXT = (
+    "· Unlimited forwards – No restrictions on forwarding messages\n"
+    "· Bulk forwarding – Forward multiple messages or groups at once\n"
+    "· High-speed performance – Fast and efficient processing\n"
+    "· More stability – Reliable uptime for continuous use\n"
+    "· Personal support – Dedicated help when you need it\n\n"
+    "➡️ To purchase the premium subscription, contact: @BotsCraftAdmin"
+)
+
 @bot.on(events.NewMessage(pattern="/premium", func=lambda e: e.is_private))
 async def premium_info(event):
-    await event.reply(
-        "Upgrade to Premium for unlimited saves.\n"
-        "**Contact:** @IzHarshit",
-        buttons=Button.url("Contact", "https://t.me/izharshit"))
+    await event.reply(PREMIUM_TEXT, link_preview=False,
+        buttons=Button.url("Contact", "https://t.me/BotsCraftAdmin"))
+
+@bot.on(events.NewMessage(pattern="/bulk", func=lambda e: e.is_private))
+async def bulk_info(event):
+    await event.reply(PREMIUM_TEXT, link_preview=False,
+        buttons=Button.url("Contact", "https://t.me/BotsCraftAdmin"))
