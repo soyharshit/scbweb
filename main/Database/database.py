@@ -32,6 +32,9 @@ class Database:
     async def total_users_count(self) -> int:
         return await self._users.estimated_document_count()
 
+    async def logged_in_count(self) -> int:
+        return await self._users.count_documents({'log': True})
+
     async def get_users(self) -> AsyncGenerator[dict, None]:
         async for doc in self._users.find({}):
             yield doc

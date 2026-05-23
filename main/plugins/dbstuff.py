@@ -33,10 +33,12 @@ async def count_users(event):
 @bot.on(events.NewMessage(incoming=True, from_users=AUTH_USERS, pattern='/stats'))
 async def stats_handler(event):
     total_users = await db.total_users_count()
+    logged_in = await db.logged_in_count()
     total_forwards = await stats_db.get_total_forwards()
     await event.reply(
         f"**Bot Statistics**\n\n"
         f"👥 Total users: `{total_users}`\n"
+        f"🔑 Logged in: `{logged_in}`\n"
         f"📤 Total forwards: `{total_forwards}`"
     )
 
