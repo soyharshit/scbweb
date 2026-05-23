@@ -142,8 +142,12 @@ async def login_phone(event):
             await msg.delete()
             msg = await conv.send_message("Sending OTP...")
             try:
-                await client.connect()
-                sent = await client.send_code(phone)
+                await asyncio.wait_for(client.connect(), timeout=30)
+                sent = await asyncio.wait_for(client.send_code(phone), timeout=30)
+            except asyncio.TimeoutError:
+                await msg.delete()
+                await conv.send_message("Connection timed out. Use /session instead.")
+                return
             except FloodWait as fw:
                 await msg.delete()
                 await conv.send_message(f"FloodWait {fw.value}s. Use /session instead.")
@@ -167,7 +171,11 @@ async def login_phone(event):
             await msg.delete()
             msg = await conv.send_message("Verifying code...")
             try:
-                await client.sign_in(phone, sent.phone_code_hash, phone_code=code)
+                await asyncio.wait_for(client.sign_in(phone, sent.phone_code_hash, phone_code=code), timeout=30)
+            except asyncio.TimeoutError:
+                await msg.delete()
+                await conv.send_message("Verification timed out. Please retry with /login.")
+                return
             except PhoneCodeInvalid:
                 await msg.delete()
                 await conv.send_message("Incorrect code. Please retry with /login.")

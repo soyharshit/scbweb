@@ -178,7 +178,7 @@ async def get_msg(userbot, user_id, msg_link, edit):
             pass
 
     if not msg:
-        await edit.edit('Cannot access the message. Forward it to your Saved Messages first, then send the link here.')
+        await edit.edit("You have not joined the channel. Please join the channel first.")
         return
 
     if not msg.media and not msg.text and not msg.caption:
@@ -188,11 +188,14 @@ async def get_msg(userbot, user_id, msg_link, edit):
     try:
         if msg.media_group_id:
             sent = await userbot.copy_media_group("me", msg.chat.id, msg.id)
-            saved_link = sent[0].link
+            saved_id = sent[0].id
         else:
-            sent = await userbot.forward_messages("me", msg.chat.id, [msg.id])
-            saved_link = sent[0].link
-        await edit.edit(f'Saved to your Saved Messages.\n{saved_link}')
+            try:
+                sent = await userbot.forward_messages("me", msg.chat.id, [msg.id])
+            except Exception:
+                sent = await userbot.copy_message("me", msg.chat.id, msg.id)
+            saved_id = sent[0].id if isinstance(sent, list) else sent.id
+        await edit.edit('Saved to your Saved Messages.', reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton('View Message', url=f'tg://openmessage?user_id={user_id}&message_id={saved_id}')]]))
         return
     except Exception:
         pass
@@ -209,7 +212,7 @@ async def get_msg(userbot, user_id, msg_link, edit):
     caption = msg.caption or ''
     entities = msg.caption_entities
     await edit.edit('Uploading...')
-    saved_link = None
+    saved_id = None
 
     try:
         if msg.video_note:
@@ -220,7 +223,7 @@ async def get_msg(userbot, user_id, msg_link, edit):
                 thumb=thumb, progress=progress_for_pyrogram,
                 progress_args=(userbot, 'Uploading...', edit, time.time())
             )
-            saved_link = sent.link
+            saved_id = sent.id
         elif msg.video:
             meta = video_meta(file)
             thumb = await gen_thumb(file, f'{user_id}.jpg')
@@ -230,27 +233,27 @@ async def get_msg(userbot, user_id, msg_link, edit):
                 thumb=thumb, progress=progress_for_pyrogram,
                 progress_args=(userbot, 'Uploading...', edit, time.time())
             )
-            saved_link = sent.link
+            saved_id = sent.id
         elif msg.photo:
             sent = await userbot.send_photo("me", file, caption=caption, caption_entities=entities)
-            saved_link = sent.link
+            saved_id = sent.id
         elif msg.audio:
             sent = await userbot.send_audio("me", file, caption=caption, caption_entities=entities,
                                              progress=progress_for_pyrogram,
                                              progress_args=(userbot, 'Uploading...', edit, time.time()))
-            saved_link = sent.link
+            saved_id = sent.id
         else:
             sent = await userbot.send_document("me", file, caption=caption, caption_entities=entities,
                                                 progress=progress_for_pyrogram,
                                                 progress_args=(userbot, 'Uploading...', edit, time.time()))
-            saved_link = sent.link
+            saved_id = sent.id
     except FloodWait as fw:
         await asyncio.sleep(fw.value)
         await edit.edit(f'Rate limited. Retry after {fw.value} seconds.')
     except Exception as e:
         await edit.edit(f'Upload failed: {e}')
     else:
-        await edit.edit(f'Saved to your Saved Messages.\n{saved_link}')
+        await edit.edit('Saved to your Saved Messages.', reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton('View Message', url=f'tg://openmessage?user_id={user_id}&message_id={saved_id}')]]))
     finally:
         if os.path.isfile(file):
             os.remove(file)
