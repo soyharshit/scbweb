@@ -66,8 +66,8 @@ async def start_handler(event):
             buttons=Button.url("Join Channel", f"https://t.me/{FORCESUB}"))
 
     await init_msg.edit(
-        f"Hi **{event.sender.first_name}**,\n"
-        f"I can help you save restricted content. Send me a link after logging in.",
+        f"Hi **{event.sender.first_name}**,I am save contents bot.\n"
+        f"I can help you save restricted content. Send me a link from your restricted channel or group to get that message.",
         buttons=[Button.url("Updates", "https://t.me/BotsCraft")])
 
     if LOGS:
@@ -356,9 +356,8 @@ async def help_handler(event):
     await event.reply(
         "**Quick Start Guide**\n\n"
         "• /login – Log in using phone number and OTP\n"
-        "• /session – Log in using a session string\n"
         "• Send any Telegram message link after logging in\n\n"
-        "Need help? Contact @IzHarshit",
+        "Need help? Contact @BotsCraftAdmin",
         link_preview=False)
 
 
