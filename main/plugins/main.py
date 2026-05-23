@@ -57,7 +57,7 @@ async def process_user_queue(user_id):
         if cooldown_end > now:
             remaining_secs = int(cooldown_end - now)
             mins, secs = divmod(remaining_secs, 60)
-            await init_msg.edit(f'Please wait {mins}m {secs}s before you can forward next message')
+            await init_msg.edit(f'Please wait {mins}m {secs}s before you can forward next message\n\nContact @BotsCraftAdmin to buy premium to remove this waiting time')
             await asyncio.sleep(remaining_secs)
 
         remaining = list(queue._queue)

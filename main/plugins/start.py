@@ -367,7 +367,8 @@ PREMIUM_TEXT = (
     "· Bulk forwarding – Forward multiple messages or groups at once\n"
     "· High-speed performance – Fast and efficient processing\n"
     "· More stability – Reliable uptime for continuous use\n"
-    "· Personal support – Dedicated help when you need it\n\n"
+    "· Personal support – Dedicated help when you need it\n"
+    "· No waiting after message forward – Forward instantly without cooldowns\n\n"
     "➡️ To purchase the premium subscription, contact: @BotsCraftAdmin"
 )
 
