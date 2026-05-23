@@ -301,7 +301,7 @@ async def clone_handler(bot_, event: Message):
 
     creds = await db.get_credentials(event.from_user.id)
     if not creds or not all(creds):
-        return await init.edit('Please log in first using /login or /session.')
+        return await init.edit('Please log in first using /login.')
 
     userbot = _clients.get(f"ub_{event.from_user.id}")
     if not userbot:
