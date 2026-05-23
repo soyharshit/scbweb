@@ -92,3 +92,23 @@ class Database:
 
     async def botLogout(self, uid: int) -> None:
         await self._users.delete_many({'id': f'bot{uid}'})
+
+
+class Stats:
+    _db = None
+
+    def __init__(self, uri: str, db_name: str = SESSION_NAME):
+        cli = motor.motor_asyncio.AsyncIOMotorClient(uri)
+        self._db = cli[db_name]
+        self._stats = self._db.stats
+
+    async def increment_forwards(self, n: int = 1) -> None:
+        await self._stats.update_one(
+            {'_id': 'stats'},
+            {'$inc': {'total_forwards': n}},
+            upsert=True
+        )
+
+    async def get_total_forwards(self) -> int:
+        doc = await self._stats.find_one({'_id': 'stats'})
+        return doc.get('total_forwards', 0) if doc else 0

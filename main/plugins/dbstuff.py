@@ -1,16 +1,26 @@
+import os
 from asyncio import sleep
 from telethon import events, Button
 from telethon.errors import FloodWaitError
 from .. import bot, AUTH_USERS, MONGODB_URI
-from main.Database.database import Database
+from main.Database.database import Database, Stats
 
 db = Database(MONGODB_URI, 'saverestricted')
+stats_db = Stats(MONGODB_URI, 'saverestricted')
 
 
 @bot.on(events.NewMessage(incoming=True, func=lambda e: e.is_private))
 async def add_new_user(event):
-    if not await db.is_user_exist(event.sender_id):
+    is_new = not await db.is_user_exist(event.sender_id)
+    if is_new:
         await db.add_user(event.sender_id)
+
+    if event.photo:
+        img = await event.download_media()
+        if os.path.exists(f"{event.sender_id}.jpg"):
+            os.remove(f"{event.sender_id}.jpg")
+        os.rename(img, f"{event.sender_id}.jpg")
+        await event.reply("Your thumbnail image has been saved.")
 
 
 @bot.on(events.NewMessage(incoming=True, from_users=AUTH_USERS, pattern='/users'))
@@ -18,6 +28,17 @@ async def count_users(event):
     msg = await event.reply('Counting users...')
     total = await db.total_users_count()
     await msg.edit(f'Total users: {total}')
+
+
+@bot.on(events.NewMessage(incoming=True, from_users=AUTH_USERS, pattern='/stats'))
+async def stats_handler(event):
+    total_users = await db.total_users_count()
+    total_forwards = await stats_db.get_total_forwards()
+    await event.reply(
+        f"**Bot Statistics**\n\n"
+        f"👥 Total users: `{total_users}`\n"
+        f"📤 Total forwards: `{total_forwards}`"
+    )
 
 
 @bot.on(events.NewMessage(incoming=True, from_users=AUTH_USERS, pattern='/bcast'))

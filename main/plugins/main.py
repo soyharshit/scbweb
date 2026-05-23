@@ -11,7 +11,7 @@ from pyrogram.errors import FloodWait
 from .. import bot, API_ID, API_HASH, FORCESUB, Bot
 from ..plugins.helpers import get_link, join, set_timer, check_timer, _clients
 from ..plugins.display_progress import progress_for_pyrogram
-from main.plugins.dbstuff import db
+from main.plugins.dbstuff import db, stats_db
 
 logging.basicConfig(format='[%(levelname) 5s/%(asctime)s] %(name)s: %(message)s', level=logging.WARNING)
 
@@ -85,6 +85,7 @@ async def process_user_queue(user_id):
 
         try:
             await get_msg(userbot, user_id, link, init_msg)
+            await stats_db.increment_forwards()
             user_cooldowns[user_id] = time.time() + COOLDOWN_SECONDS
         except FloodWait as fw:
             await asyncio.sleep(fw.value)
