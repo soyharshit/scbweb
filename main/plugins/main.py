@@ -131,10 +131,18 @@ async def gen_thumb(video, out):
     cap.set(cv2.CAP_PROP_POS_FRAMES, int(cap.get(cv2.CAP_PROP_FRAME_COUNT) // 2))
     ret, frame = cap.read()
     cap.release()
-    if ret:
-        cv2.imwrite(out, frame)
-        return out
-    return None
+    if not ret:
+        return None
+    h, w = frame.shape[:2]
+    if w > 320 or h > 320:
+        scale = 320 / max(w, h)
+        new_w, new_h = int(w * scale), int(h * scale)
+        frame = cv2.resize(frame, (new_w, new_h))
+    cv2.imwrite(out, frame)
+    if os.path.getsize(out) > 200 * 1024:
+        os.remove(out)
+        return None
+    return out
 
 
 async def get_msg(userbot, user_id, msg_link, edit):
