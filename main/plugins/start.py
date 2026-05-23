@@ -302,7 +302,7 @@ async def logout_user(event):
         await event.reply("You are not logged in.")
 
 
-@bot.on(events.NewMessage(pattern="^/server$", func=lambda e: e.is_private))
+@bot.on(events.NewMessage(from_users=AUTH_USERS, pattern="^/server$"))
 async def server_stats(event):
     msg = await event.reply("Fetching server stats...")
     uptime = get_readable_time(time.time() - StartTime)
