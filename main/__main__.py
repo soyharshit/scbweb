@@ -17,17 +17,10 @@ for name in files:
 
 async def preload_entities():
     if LOGS:
-        try:
-            await bot.get_dialogs(limit=100)
-            logging.warning("📥 Dialogs preloaded for LOGS channel.")
-        except Exception as e:
-            logging.error("⚠️ Failed to preload dialogs: %s", e)
+        logging.warning("LOGS channel configured.")
 
 print("Successfully deployed!")
 
 if __name__ == "__main__":
     bot.loop.run_until_complete(preload_entities())
     bot.run_until_disconnected()
-    
-
-

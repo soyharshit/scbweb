@@ -1,11 +1,12 @@
-FROM debian:latest
+FROM python:3.11-slim
 
-RUN apt update && apt upgrade -y
-RUN apt install git curl python3-pip ffmpeg -y
-RUN pip3 install -U pip
-RUN cd /
-RUN git clone https://github.com/pyrogramers/saverestricted
-RUN cd saverestricted
-WORKDIR /saverestricted
-RUN pip3 install -U -r requirements.txt
-CMD python3 main.py
+RUN apt update && apt install -y ffmpeg git && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+COPY requirements.txt .
+RUN pip install -U pip && pip install -r requirements.txt
+
+COPY . .
+
+CMD ["uv", "run", "-m", "main"]

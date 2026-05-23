@@ -1,5 +1,3 @@
-# main/__init__.py
-
 import os
 import sys
 import logging
@@ -14,6 +12,7 @@ logging.basicConfig(
 
 load_dotenv()
 
+
 def getenv_int(key: str, default=None) -> int | None:
     val = os.getenv(key, default)
     try:
@@ -21,27 +20,26 @@ def getenv_int(key: str, default=None) -> int | None:
     except (ValueError, TypeError):
         return default
 
+
 def getenv_int_list(key: str, default=None) -> list[int]:
     raw = os.getenv(key)
     if not raw:
         return default or []
     return [int(u.strip()) for u in raw.split() if u.strip().isdigit()]
 
-# ---------- Environment Variables ----------
+
 API_ID = getenv_int("API_ID", 4680197)
 API_HASH = os.getenv("API_HASH", "495b0228624028d635bd748b22985f67")
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 FORCESUB = os.getenv("FORCESUB")
-MONGODB_URI = os.getenv("MONGODB_URI", "mongodb+srv://itsharshit_db_user:QJhxnouQBv07eLcB@cluster0.hcrawmw.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0")
-LOGS = getenv_int("LOGS")  # Optional: leave unset or empty in .env to disable
+MONGODB_URI = os.getenv("MONGODB_URI")
+LOGS = getenv_int("LOGS")
 AUTH_USERS = getenv_int_list("AUTH_USERS", [7477152489])
 
-# ---------- Sanity Check ----------
 if not all([API_ID, API_HASH, BOT_TOKEN]):
-    logging.error("❌ Missing API_ID, API_HASH, or BOT_TOKEN in environment.")
+    logging.error("Missing API_ID, API_HASH, or BOT_TOKEN in environment.")
     sys.exit(1)
 
-# ---------- Clients (defined but NOT started here) ----------
 bot = TelegramClient("bot", API_ID, API_HASH).start(bot_token=BOT_TOKEN)
 
 Bot = Client(

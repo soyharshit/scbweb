@@ -1,0 +1,25 @@
+[project]
+name = "file-doenloader"
+version = "0.1.0"
+description = "Telegram bot for saving and forwarding restricted content"
+requires-python = ">=3.10"
+dependencies = [
+    "telethon>=1.31.1",
+    "pyrogram>=2.0.106",
+    "tgcrypto>=1.2.5",
+    "python-dotenv>=1.0.0",
+    "psutil>=5.9.5",
+    "opencv-python>=4.8.1.78",
+    "motor>=3.3.2",
+    "pymongo>=4.5.0",
+]
+
+[project.scripts]
+start-bot = "main.__main__:main"
+
+[dependency-groups]
+dev = []
+
+[build-system]
+requires = ["setuptools>=68.0"]
+build-backend = "setuptools.build_meta"

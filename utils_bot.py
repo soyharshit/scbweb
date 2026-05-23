@@ -1,12 +1,8 @@
-import logging
-import os
 import threading
 import time
-from asyncio import TimeoutError
-from pyrogram import filters
 
-LOGGER = logging.getLogger(__name__)
 SIZE_UNITS = ['B', 'KB', 'MB', 'GB', 'TB', 'PB']
+
 
 class setInterval:
     def __init__(self, interval, action):
@@ -40,26 +36,6 @@ def get_readable_file_size(size_in_bytes) -> str:
 
 
 def get_readable_time(seconds: int) -> str:
-    result = ''
-    (days, remainder) = divmod(seconds, 86400)
-    days = int(days)
-    if days != 0:
-        result += f'{days}d'
-    (hours, remainder) = divmod(remainder, 3600)
-    hours = int(hours)
-    if hours != 0:
-        result += f'{hours}h'
-    (minutes, seconds) = divmod(remainder, 60)
-    minutes = int(minutes)
-    if minutes != 0:
-        result += f'{minutes}m'
-    seconds = int(seconds)
-    result += f'{seconds}s'
-    return result
-
-
-
-def readable_time(seconds: int) -> str:
     result = ''
     (days, remainder) = divmod(seconds, 86400)
     days = int(days)
