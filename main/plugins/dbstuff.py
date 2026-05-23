@@ -11,8 +11,11 @@ stats_db = Stats(MONGODB_URI, 'saverestricted')
 
 @bot.on(events.NewMessage(incoming=True, func=lambda e: e.is_private))
 async def add_new_user(event):
-    is_new = not await db.is_user_exist(event.sender_id)
-    if is_new:
+    msg_id = event.id
+    if msg_id in _processed:
+        return
+    _processed.add(msg_id)
+    if not await db.is_user_exist(event.sender_id):
         await db.add_user(event.sender_id)
 
     if event.photo:
@@ -23,8 +26,21 @@ async def add_new_user(event):
         await event.reply("Your thumbnail image has been saved.")
 
 
+_processed = set()
+
+async def clean_processed():
+    while True:
+        await sleep(600)
+        _processed.clear()
+
+bot.loop.create_task(clean_processed())
+
 @bot.on(events.NewMessage(incoming=True, from_users=AUTH_USERS, pattern='/users'))
 async def count_users(event):
+    msg_id = event.id
+    if msg_id in _processed:
+        return
+    _processed.add(msg_id)
     msg = await event.reply('Counting users...')
     total = await db.total_users_count()
     await msg.edit(f'Total users: {total}')
@@ -32,6 +48,10 @@ async def count_users(event):
 
 @bot.on(events.NewMessage(incoming=True, from_users=AUTH_USERS, pattern='/stats'))
 async def stats_handler(event):
+    msg_id = event.id
+    if msg_id in _processed:
+        return
+    _processed.add(msg_id)
     total_users = await db.total_users_count()
     logged_in = await db.logged_in_count()
     total_forwards = await stats_db.get_total_forwards()
