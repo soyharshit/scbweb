@@ -15,10 +15,13 @@ from main.plugins.dbstuff import db
 
 logging.basicConfig(format='[%(levelname) 5s/%(asctime)s] %(name)s: %(message)s', level=logging.WARNING)
 
+COOLDOWN_SECONDS = 300
+
 process = []
 timer = []
 user_queues = {}
 user_processing = set()
+user_cooldowns = {}
 
 
 async def enqueue_and_process(user_id, link, init_msg):
@@ -49,6 +52,14 @@ async def process_user_queue(user_id):
     while not queue.empty():
         link, init_msg = await queue.get()
 
+        now = time.time()
+        cooldown_end = user_cooldowns.get(user_id, 0)
+        if cooldown_end > now:
+            remaining_secs = int(cooldown_end - now)
+            mins, secs = divmod(remaining_secs, 60)
+            await init_msg.edit(f'Please wait {mins}m {secs}s before you can forward next message')
+            await asyncio.sleep(remaining_secs)
+
         remaining = list(queue._queue)
         for idx, (_, msg) in enumerate(remaining):
             try:
@@ -74,6 +85,7 @@ async def process_user_queue(user_id):
 
         try:
             await get_msg(userbot, user_id, link, init_msg)
+            user_cooldowns[user_id] = time.time() + COOLDOWN_SECONDS
         except FloodWait as fw:
             await asyncio.sleep(fw.value)
             try:
