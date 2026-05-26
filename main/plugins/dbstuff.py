@@ -10,14 +10,12 @@ stats_db = Stats(MONGODB_URI, 'saverestricted')
 
 
 _processed_all = set()
-_processed_users = set()
 _processed_stats = set()
 
 async def clean_processed():
     while True:
         await sleep(600)
         _processed_all.clear()
-        _processed_users.clear()
         _processed_stats.clear()
 
 bot.loop.create_task(clean_processed())
@@ -37,17 +35,6 @@ async def add_new_user(event):
             os.remove(f"{event.sender_id}.jpg")
         os.rename(img, f"{event.sender_id}.jpg")
         await event.reply("Your thumbnail image has been saved.")
-
-
-@bot.on(events.NewMessage(incoming=True, from_users=AUTH_USERS, pattern='/users'))
-async def count_users(event):
-    msg_id = event.id
-    if msg_id in _processed_users:
-        return
-    _processed_users.add(msg_id)
-    msg = await event.reply('Counting users...')
-    total = await db.total_users_count()
-    await msg.edit(f'Total users: {total}')
 
 
 @bot.on(events.NewMessage(incoming=True, from_users=AUTH_USERS, pattern='/stats'))

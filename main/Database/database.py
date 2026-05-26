@@ -11,7 +11,16 @@ class Database:
         self._cli = motor.motor_asyncio.AsyncIOMotorClient(uri)
         self._db = self._cli[name]
         self._users = self._db.users
-        self._users.create_index('id', unique=True)
+
+    async def _ensure_indexes(self) -> None:
+        pipeline = [
+            {'$group': {'_id': '$id', 'dups': {'$addToSet': '$_id'}, 'count': {'$sum': 1}}},
+            {'$match': {'count': {'$gt': 1}}}
+        ]
+        async for dup in self._users.aggregate(pipeline):
+            dup_ids = dup['dups'][1:]
+            await self._users.delete_many({'_id': {'$in': dup_ids}})
+        await self._users.create_index('id', unique=True)
 
     async def _update(self, uid: int, payload: dict) -> None:
         await self._users.update_one({'id': uid}, {'$set': payload}, upsert=True)
@@ -24,7 +33,9 @@ class Database:
                 'api_hash': None, 'session': None, 'log': False}
 
     async def add_user(self, uid: int) -> None:
-        await self._users.insert_one(self._new_user(uid))
+        await self._users.update_one(
+            {'id': uid}, {'$setOnInsert': self._new_user(uid)}, upsert=True
+        )
 
     async def is_user_exist(self, uid: int) -> bool:
         return bool(await self._users.find_one({'id': uid}))

@@ -16,6 +16,8 @@ for name in files:
         load_plugins(plugin_name.replace(".py", ""))
 
 async def preload_entities():
+    from main.plugins.dbstuff import db
+    await db._ensure_indexes()
     if LOGS:
         logging.warning("LOGS channel configured.")
 
