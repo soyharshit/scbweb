@@ -27,12 +27,12 @@ os.makedirs(downloads, exist_ok=True)
 StartTime = time.time()
 
 
-def _is_cancel(event, text: str):
+async def _is_cancel(event, text: str):
     if text.startswith("/abort"):
-        event.reply("Process aborted.")
+        await event.reply("Process aborted.")
         return True
     elif text.startswith("/"):
-        event.reply("Cancelled the generation process!")
+        await event.reply("Cancelled the generation process!")
         return True
     else:
         return False
@@ -85,7 +85,7 @@ async def save_thumbnail(event):
     async with bot.conversation(event.chat_id) as conv:
         ask_img = await conv.send_message("Send an image to set as your thumbnail.")
         img_resp = await conv.get_response()
-        if _is_cancel(event, img_resp.text):
+        if await _is_cancel(event, img_resp.text):
             return
         if not img_resp.photo:
             return await ask_img.edit("Only images are accepted.")
@@ -129,7 +129,7 @@ async def login_phone(event):
                     "Please send your phone number in **international format**\n"
                     "(e.g. `+1 58543464`):")
                 resp = await conv.get_response()
-                if _is_cancel(event, resp.text):
+                if await _is_cancel(event, resp.text):
                     return
                 cleaned = resp.text.strip().replace(" ", "").replace("-", "")
                 if PHONE_RE.match(cleaned):
@@ -164,9 +164,9 @@ async def login_phone(event):
             await msg.delete()
             msg = await conv.send_message("OTP sent! Enter the code in `1 2 3 4 5` format:")
             code_resp = await conv.get_response()
-            if _is_cancel(event, code_resp.text):
+            if await _is_cancel(event, code_resp.text):
                 return
-            code = " ".join(code_resp.text.split())
+            code = code_resp.text.replace(" ", "")
 
             await msg.delete()
             msg = await conv.send_message("Verifying code...")
@@ -188,12 +188,12 @@ async def login_phone(event):
                 await msg.delete()
                 msg = await conv.send_message("2FA password required. Please enter your password:")
                 pwd_resp = await conv.get_response()
-                if _is_cancel(event, pwd_resp.text):
+                if await _is_cancel(event, pwd_resp.text):
                     return
                 await msg.delete()
                 msg = await conv.send_message("Verifying password...")
                 try:
-                    await asyncio.wait_for(client.check_password(pwd_resp.text), timeout=30)
+                    await asyncio.wait_for(client.check_password(pwd_resp.text), timeout=15)
                 except PasswordHashInvalid:
                     await msg.delete()
                     await conv.send_message("Wrong password. Please try /login again.")
@@ -208,7 +208,10 @@ async def login_phone(event):
                 return
 
             s = await client.export_session_string()
-            me = await client.get_me()
+            client.me = await client.get_me()
+            me = client.me
+            if not client.is_initialized:
+                await client.initialize()
             await db.loin(event.sender_id)
             await login(event.sender_id, API_ID, API_HASH, s)
 
@@ -233,7 +236,11 @@ async def login_phone(event):
         await event.reply(f"Logged in as {me.first_name}. You can now send links to save content.")
     finally:
         if _clients.get(f"ub_{event.sender_id}") is not client:
-            await client.disconnect()
+            try:
+                if client.is_connected:
+                    await client.disconnect()
+            except ConnectionError:
+                pass
 
 
 @bot.on(events.NewMessage(pattern="/session", func=lambda e: e.is_private))
@@ -245,7 +252,7 @@ async def login_session(event):
     async with bot.conversation(event.chat_id) as conv:
         await conv.send_message("Please send your **Pyrogram** session string:")
         resp = await conv.get_response()
-        if _is_cancel(event, resp.text):
+        if await _is_cancel(event, resp.text):
             return
         s = resp.text.strip()
 

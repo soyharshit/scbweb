@@ -38,7 +38,9 @@ async def join(client: Client, invite: str) -> str:
         return "Failed to join the channel."
 
 
-def get_link(text: str) -> str | None:
+def get_link(text: str | None) -> str | None:
+    if not text:
+        return None
     pattern = r"(?i)\b((?:https?://)?(?:t\.me|www\.\w+\.\w+)/[^\s]+)"
     match = re.search(pattern, text)
     return match.group(1) if match else None

@@ -1,7 +1,6 @@
 import os
 import time
 import asyncio
-import re
 import cv2
 import logging
 from pyrogram import Client, filters
@@ -9,7 +8,7 @@ from pyrogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton
 from pyrogram.errors import FloodWait
 
 from .. import bot, API_ID, API_HASH, FORCESUB, Bot
-from ..plugins.helpers import get_link, join, set_timer, check_timer, _clients
+from ..plugins.helpers import get_link, join, _clients
 from ..plugins.display_progress import progress_for_pyrogram
 from main.plugins.dbstuff import db, stats_db
 
@@ -17,91 +16,8 @@ logging.basicConfig(format='[%(levelname) 5s/%(asctime)s] %(name)s: %(message)s'
 
 COOLDOWN_SECONDS = 300
 
-process = []
-timer = []
-user_queues = {}
-user_processing = set()
 user_cooldowns = {}
 
-
-async def enqueue_and_process(user_id, link, init_msg):
-    if user_id not in user_queues:
-        user_queues[user_id] = asyncio.Queue()
-
-    queue = user_queues[user_id]
-    is_processing = user_id in user_processing
-
-    if is_processing:
-        pos = queue.qsize() + 1
-        await init_msg.edit(f'Added to queue. Position: #{pos}')
-    else:
-        user_processing.add(user_id)
-
-    await queue.put((link, init_msg))
-
-    if not is_processing:
-        asyncio.create_task(process_user_queue(user_id))
-
-
-async def process_user_queue(user_id):
-    queue = user_queues.get(user_id)
-    if not queue:
-        user_processing.discard(user_id)
-        return
-
-    while not queue.empty():
-        link, init_msg = await queue.get()
-
-        now = time.time()
-        cooldown_end = user_cooldowns.get(user_id, 0)
-        if cooldown_end > now:
-            remaining_secs = int(cooldown_end - now)
-            mins, secs = divmod(remaining_secs, 60)
-            await init_msg.edit(f'Please wait {mins}m {secs}s before you can forward next message\n\nContact @BotsCraftAdmin to buy premium to remove this waiting time')
-            await asyncio.sleep(remaining_secs)
-
-        remaining = list(queue._queue)
-        for idx, (_, msg) in enumerate(remaining):
-            try:
-                await msg.edit(f'Added to queue. Position: #{idx + 1}')
-            except Exception:
-                pass
-
-        userbot = _clients.get(f"ub_{user_id}")
-
-        if not userbot:
-            try:
-                await init_msg.edit('Session expired. Please re-login.')
-            except Exception:
-                pass
-            continue
-
-        txt = getattr(init_msg, 'text', '') or ''
-        if 'Added to queue' in txt or 'Position' in txt:
-            try:
-                await init_msg.edit('Processing...')
-            except Exception:
-                pass
-
-        try:
-            await get_msg(userbot, user_id, link, init_msg)
-            await stats_db.increment_forwards()
-            user_cooldowns[user_id] = time.time() + COOLDOWN_SECONDS
-        except FloodWait as fw:
-            await asyncio.sleep(fw.value)
-            try:
-                await init_msg.edit(f'Rate limited. Retry after {fw.value}s.')
-            except Exception:
-                pass
-        except Exception as e:
-            try:
-                await init_msg.edit(f'Error: {e}')
-            except Exception:
-                pass
-
-    user_processing.discard(user_id)
-    if user_id in user_queues and user_queues[user_id].empty():
-        del user_queues[user_id]
 
 
 async def is_user_subscribed(uid):
@@ -167,15 +83,45 @@ async def get_msg(userbot, user_id, msg_link, edit):
             chat_ids.append(int(msg_link.split('/')[-2]))
             msg_id = int(msg_link.split('/')[-1].split('?')[0])
         elif 't.me/' in msg_link:
-            username = msg_link.split('/')[-2]
-            msg_id = int(msg_link.split('/')[-1].split('?')[0])
-            chat_ids.append(username)
+            parts = msg_link.split('/')
+            if len(parts) >= 6 and not parts[-2].startswith('c') and not parts[-2].startswith('b'):
+                chat_ids.append(parts[-3])
+                chat_ids.append(parts[-2])
+            else:
+                chat_ids.append(parts[-2])
+            try:
+                msg_id = int(parts[-1].split('?')[0])
+            except ValueError:
+                await edit.edit('Invalid message link.')
+                return
         else:
             await edit.edit('Unsupported link format.')
             return
     except (ValueError, IndexError):
         await edit.edit('Invalid message link.')
         return
+
+    if 't.me/c/' in msg_link or 't.me/b/' in msg_link:
+        try:
+            user_chat_ids = set()
+            async for dialog in userbot.get_dialogs(limit=500):
+                cid = getattr(dialog.chat, 'id', None)
+                if cid is not None:
+                    user_chat_ids.add(cid)
+                    user_chat_ids.add(abs(cid))
+
+            int_chat_ids = [cid for cid in chat_ids if isinstance(cid, int)]
+            if int_chat_ids and not any(
+                cid in user_chat_ids or abs(cid) in user_chat_ids
+                for cid in int_chat_ids
+            ):
+                await edit.edit(
+                    "You haven't joined this chat or you don't have access to it.\n"
+                    "Please join the chat first, then try again."
+                )
+                return
+        except Exception:
+            pass
 
     msg = None
     for cid in chat_ids:
@@ -199,7 +145,7 @@ async def get_msg(userbot, user_id, msg_link, edit):
             pass
 
     if not msg:
-        await edit.edit("You have not joined the channel. Please join the channel first.")
+        await edit.edit("Could not fetch the message. Please check the link and make sure you have access to it.")
         return
 
     if not msg.media and not msg.text and not msg.caption:
@@ -289,9 +235,21 @@ async def clone_handler(bot_, event: Message):
     if not link:
         return
 
+    uid = event.from_user.id
+
+    now = time.time()
+    cooldown_end = user_cooldowns.get(uid, 0)
+    if cooldown_end > now:
+        remaining_secs = int(cooldown_end - now)
+        mins, secs = divmod(remaining_secs, 60)
+        return await event.reply(f'Please wait {mins}m {secs}s before you can forward next message\n\nContact @BotsCraftAdmin to buy premium to remove this waiting time')
+
+    user_cooldowns[uid] = now + COOLDOWN_SECONDS
+
     init = await event.reply('Processing...')
 
-    if not await is_user_subscribed(event.from_user.id):
+    if not await is_user_subscribed(uid):
+        user_cooldowns.pop(uid, None)
         join_url = f"https://t.me/{FORCESUB}"
         return await init.edit(
             'Please join the channel first to use this bot.',
@@ -300,14 +258,26 @@ async def clone_handler(bot_, event: Message):
             ])
         )
 
-    creds = await db.get_credentials(event.from_user.id)
+    creds = await db.get_credentials(uid)
     if not creds or not all(creds):
+        user_cooldowns.pop(uid, None)
         return await init.edit('Please log in first using /login.')
 
-    userbot = _clients.get(f"ub_{event.from_user.id}")
+    userbot = _clients.get(f"ub_{uid}")
+    if userbot:
+        try:
+            await userbot.get_me()
+        except Exception:
+            userbot = None
+            old = _clients.pop(f"ub_{uid}", None)
+            if old:
+                try:
+                    await old.disconnect()
+                except Exception:
+                    pass
     if not userbot:
         userbot = Client(
-            name=f"user_{event.from_user.id}",
+            name=f"user_{uid}",
             api_id=creds[0],
             api_hash=creds[1],
             session_string=creds[2],
@@ -316,15 +286,24 @@ async def clone_handler(bot_, event: Message):
         try:
             await userbot.start()
             await userbot.get_me()
-            _clients[f"ub_{event.from_user.id}"] = userbot
+            _clients[f"ub_{uid}"] = userbot
         except Exception as e:
-            _clients.pop(f"ub_{event.from_user.id}", None)
+            _clients.pop(f"ub_{uid}", None)
+            user_cooldowns.pop(uid, None)
             return await init.edit(f'User session error: {e}')
 
     if 't.me/+' in link or 't.me/joinchat/' in link:
         out = await join(userbot, link)
         await init.edit(out)
     else:
-        await enqueue_and_process(event.from_user.id, link, init)
+        try:
+            await get_msg(userbot, uid, link, init)
+            await stats_db.increment_forwards()
+        except FloodWait as fw:
+            await asyncio.sleep(fw.value)
+            await init.edit(f'Rate limited. Retry after {fw.value}s.')
+        except Exception as e:
+            user_cooldowns.pop(uid, None)
+            await init.edit(f'Error: {e}')
 
 

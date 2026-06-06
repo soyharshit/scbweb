@@ -2,7 +2,7 @@ import glob
 from pathlib import Path
 from main.utils import load_plugins
 import logging
-from . import bot, LOGS
+from . import bot, Bot, LOGS
 
 logging.basicConfig(format='[%(levelname) 5s/%(asctime)s] %(name)s: %(message)s',
                     level=logging.WARNING)
@@ -21,8 +21,16 @@ async def preload_entities():
     if LOGS:
         logging.warning("LOGS channel configured.")
 
+async def start_pyrogram():
+    try:
+        await Bot.start()
+        logging.warning("Pyrogram Bot started successfully.")
+    except Exception as e:
+        logging.error("Failed to start Pyrogram Bot: %s", e)
+
 print("Successfully deployed!")
 
 if __name__ == "__main__":
     bot.loop.run_until_complete(preload_entities())
+    bot.loop.run_until_complete(start_pyrogram())
     bot.run_until_disconnected()

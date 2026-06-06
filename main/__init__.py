@@ -48,8 +48,3 @@ Bot = Client(
     api_id=int(API_ID),
     api_hash=API_HASH
 )
-try:
-    Bot.start()
-except Exception as e:
-    print(e)
-    sys.exit(1)
