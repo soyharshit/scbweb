@@ -8,13 +8,17 @@ from pyrogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton
 from pyrogram.errors import FloodWait
 
 from .. import bot, API_ID, API_HASH, FORCESUB, Bot
-from ..plugins.helpers import get_link, join, _clients
+from ..plugins.helpers import get_link, join, _clients, split_file
 from ..plugins.display_progress import progress_for_pyrogram
 from main.plugins.dbstuff import db, stats_db
 
 logging.basicConfig(format='[%(levelname) 5s/%(asctime)s] %(name)s: %(message)s', level=logging.WARNING)
 
 COOLDOWN_SECONDS = 300
+MAX_FILE_SIZE = 4 * 1024 * 1024 * 1024
+SPLIT_THRESHOLD = 2 * 1024 * 1024 * 1024
+SPLIT_CHUNK_SIZE = 1900 * 1024 * 1024
+MAX_SPLIT_PARTS = 2
 
 user_cooldowns = {}
 
@@ -176,6 +180,106 @@ async def get_msg(userbot, user_id, msg_link, edit):
         await edit.edit('Failed to download media.')
         return
 
+    size_bytes = os.path.getsize(file)
+    size_mib = size_bytes / (1024 * 1024)
+    size_gib = size_mib / 1024
+
+    if size_bytes > MAX_FILE_SIZE:
+        await edit.edit(
+            f"File too large ({size_gib:.2f} GB). Telegram's absolute maximum is 4 GB."
+        )
+        if os.path.isfile(file):
+            os.remove(file)
+        return
+
+    is_premium = bool(getattr(userbot, "_is_premium", False))
+
+    if size_bytes > SPLIT_THRESHOLD and not is_premium:
+        mime = ""
+        if msg.document:
+            mime = (getattr(msg.document, "mime_type", "") or "").lower()
+        is_splittable = bool(msg.document) and not mime.startswith("video/")
+
+        if not is_splittable:
+            await edit.edit(
+                f"File is {size_gib:.2f} GB, which exceeds the 2 GB limit for non-Premium accounts.\n\n"
+                f"Videos and other media files cannot be split safely.\n"
+                f"Upgrade to Telegram Premium to upload files up to 4 GB."
+            )
+            if os.path.isfile(file):
+                os.remove(file)
+            return
+
+        await edit.edit('Splitting file...')
+        try:
+            parts = await split_file(file, SPLIT_CHUNK_SIZE)
+        except Exception as e:
+            await edit.edit(f'Split failed: {e}')
+            if os.path.isfile(file):
+                os.remove(file)
+            return
+
+        if len(parts) > MAX_SPLIT_PARTS:
+            await edit.edit(
+                f"File would split into {len(parts)} parts, exceeding the maximum of {MAX_SPLIT_PARTS}.\n"
+                f"Maximum splittable size is ~{(SPLIT_CHUNK_SIZE * MAX_SPLIT_PARTS) / (1024**3):.1f} GB.\n"
+                f"Upgrade to Telegram Premium to upload files up to 4 GB."
+            )
+            for p in parts:
+                try:
+                    os.remove(p)
+                except OSError:
+                    pass
+            if os.path.isfile(file):
+                os.remove(file)
+            return
+
+        original_name = os.path.basename(file)
+        total = len(parts)
+        first_saved_id = None
+
+        for idx, part in enumerate(parts, 1):
+            try:
+                await edit.edit(f'Uploading part {idx}/{total}...')
+                sent = await userbot.send_document(
+                    "me", part,
+                    caption=(
+                        f"Part {idx}/{total} of {original_name}\n\n"
+                        f"To rejoin:\n"
+                        f"Linux/Mac: cat '{original_name}.part.*' > '{original_name}'\n"
+                        f"Windows: copy /b '{original_name}.part.*' '{original_name}'"
+                    ),
+                    progress=progress_for_pyrogram,
+                    progress_args=(userbot, f'Uploading part {idx}/{total}...', edit, time.time())
+                )
+                if idx == 1:
+                    first_saved_id = sent.id
+            except FloodWait as fw:
+                await asyncio.sleep(fw.value)
+                await edit.edit(
+                    f'Rate limited during part {idx}/{total}. Some parts may already be uploaded.'
+                )
+                return
+            except Exception as e:
+                await edit.edit(f'Failed at part {idx}/{total}: {e}')
+                return
+
+        for p in parts:
+            try:
+                os.remove(p)
+            except OSError:
+                pass
+        if os.path.isfile(file):
+            os.remove(file)
+
+        await edit.edit(
+            f'Saved as {total} parts to your Saved Messages.\nRejoin to use.',
+            reply_markup=InlineKeyboardMarkup([[
+                InlineKeyboardButton('View Part 1', url=f'tg://openmessage?user_id={user_id}&message_id={first_saved_id}')
+            ]])
+        )
+        return
+
     caption = msg.caption or ''
     entities = msg.caption_entities
     await edit.edit('Uploading...')
@@ -218,7 +322,14 @@ async def get_msg(userbot, user_id, msg_link, edit):
         await asyncio.sleep(fw.value)
         await edit.edit(f'Rate limited. Retry after {fw.value} seconds.')
     except Exception as e:
-        await edit.edit(f'Upload failed: {e}')
+        err = str(e)
+        if "2000" in err and ("MiB" in err or "MB" in err or "megab" in err.lower()):
+            await edit.edit(
+                f"Upload failed: file exceeds the 2 GB limit for non-Premium accounts.\n"
+                f"Upgrade to Telegram Premium to upload files up to 4 GB."
+            )
+        else:
+            await edit.edit(f'Upload failed: {e}')
     else:
         await edit.edit('Saved to your Saved Messages.', reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton('View Message', url=f'tg://openmessage?user_id={user_id}&message_id={saved_id}')]]))
     finally:
@@ -285,7 +396,8 @@ async def clone_handler(bot_, event: Message):
         )
         try:
             await userbot.start()
-            await userbot.get_me()
+            me = await userbot.get_me()
+            userbot._is_premium = bool(getattr(me, "is_premium", False))
             _clients[f"ub_{uid}"] = userbot
         except Exception as e:
             _clients.pop(f"ub_{uid}", None)

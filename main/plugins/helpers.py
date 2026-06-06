@@ -2,6 +2,7 @@ import os
 import time
 import asyncio
 import re
+import glob
 from pyrogram import Client
 from pyrogram.errors import FloodWait
 from main.Database.database import Database
@@ -76,3 +77,38 @@ async def screenshot(video: str, ts: int | float, uid: int) -> str | None:
                                                 stderr=asyncio.subprocess.PIPE)
     await proc.communicate()
     return thumb if os.path.isfile(thumb) else None
+
+
+def _split_file_sync(input_path: str, chunk_size_bytes: int) -> list[str]:
+    base = os.path.splitext(input_path)[0]
+    for old in glob.glob(f"{base}.part.*"):
+        try:
+            os.remove(old)
+        except OSError:
+            pass
+
+    file_size = os.path.getsize(input_path)
+    if file_size <= chunk_size_bytes:
+        return [input_path]
+
+    num_parts = (file_size + chunk_size_bytes - 1) // chunk_size_bytes
+    parts: list[str] = []
+    buffer_size = 8 * 1024 * 1024
+
+    with open(input_path, "rb") as f:
+        for i in range(num_parts):
+            part_path = f"{base}.part.{i:02d}"
+            parts.append(part_path)
+            with open(part_path, "wb") as pf:
+                remaining = chunk_size_bytes
+                while remaining > 0:
+                    data = f.read(min(remaining, buffer_size))
+                    if not data:
+                        break
+                    pf.write(data)
+                    remaining -= len(data)
+    return parts
+
+
+async def split_file(input_path: str, chunk_size_bytes: int) -> list[str]:
+    return await asyncio.to_thread(_split_file_sync, input_path, chunk_size_bytes)
