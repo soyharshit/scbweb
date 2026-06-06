@@ -8,7 +8,9 @@ from pyrogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton
 from pyrogram.errors import FloodWait
 
 from .. import bot, API_ID, API_HASH, FORCESUB, Bot
-from ..plugins.helpers import get_link, join, _clients, split_file
+from ..plugins.helpers import (
+    get_link, join, _clients, split_file, split_media_file, is_ffmpeg_available
+)
 from ..plugins.display_progress import progress_for_pyrogram
 from main.plugins.dbstuff import db, stats_db
 
@@ -152,8 +154,28 @@ async def get_msg(userbot, user_id, msg_link, edit):
         await edit.edit("Could not fetch the message. Please check the link and make sure you have access to it.")
         return
 
-    if not msg.media and not msg.text and not msg.caption:
-        await edit.edit('Message has no content to save.')
+    if getattr(msg, 'empty', False):
+        logging.warning(f"Empty message returned for link: {msg_link} (msg_id={msg_id})")
+        await edit.edit(
+            "This message is empty or has been deleted.\n"
+            "The link may be invalid, or your user session may lack access to this chat."
+        )
+        return
+
+    if msg.service:
+        await edit.edit('This is a service message with no saveable content.')
+        return
+
+    if not msg.media and not msg.text and not msg.caption and not msg.sticker and not msg.poll:
+        logging.warning(
+            f"No saveable content for link: {msg_link} (msg_id={msg_id}), "
+            f"type={type(msg).__name__}, media={getattr(msg, 'media', None)}, "
+            f"has_text={bool(msg.text)}, has_caption={bool(msg.caption)}"
+        )
+        await edit.edit(
+            "Message has no saveable content.\n"
+            "Supported: text, photos, videos, documents, audio, voice, stickers, animations, polls."
+        )
         return
 
     try:
@@ -195,15 +217,23 @@ async def get_msg(userbot, user_id, msg_link, edit):
     is_premium = bool(getattr(userbot, "_is_premium", False))
 
     if size_bytes > SPLIT_THRESHOLD and not is_premium:
+        is_media_file = bool(
+            msg.video or msg.video_note or msg.animation or msg.audio or msg.voice
+        )
         mime = ""
         if msg.document:
             mime = (getattr(msg.document, "mime_type", "") or "").lower()
-        is_splittable = bool(msg.document) and not mime.startswith("video/")
+            if mime.startswith("video/") or mime.startswith("audio/"):
+                is_media_file = True
 
-        if not is_splittable:
+        is_binary_splittable = bool(msg.document) and not (
+            mime.startswith("video/") or mime.startswith("audio/")
+        )
+
+        if not (is_media_file or is_binary_splittable):
             await edit.edit(
-                f"File is {size_gib:.2f} GB, which exceeds the 2 GB limit for non-Premium accounts.\n\n"
-                f"Videos and other media files cannot be split safely.\n"
+                f"File is {size_gib:.2f} GB, which exceeds the 2 GB limit for non-Premium accounts.\n"
+                f"Photos cannot be split safely.\n"
                 f"Upgrade to Telegram Premium to upload files up to 4 GB."
             )
             if os.path.isfile(file):
@@ -212,7 +242,20 @@ async def get_msg(userbot, user_id, msg_link, edit):
 
         await edit.edit('Splitting file...')
         try:
-            parts = await split_file(file, SPLIT_CHUNK_SIZE)
+            if is_media_file:
+                if not await is_ffmpeg_available():
+                    await edit.edit(
+                        "ffmpeg is not available on the server, so this media file cannot be split.\n"
+                        "Upgrade to Telegram Premium to upload files up to 4 GB without splitting."
+                    )
+                    if os.path.isfile(file):
+                        os.remove(file)
+                    return
+                parts = await split_media_file(file, MAX_SPLIT_PARTS)
+                split_method = "ffmpeg"
+            else:
+                parts = await split_file(file, SPLIT_CHUNK_SIZE)
+                split_method = "binary"
         except Exception as e:
             await edit.edit(f'Split failed: {e}')
             if os.path.isfile(file):
@@ -234,46 +277,79 @@ async def get_msg(userbot, user_id, msg_link, edit):
                 os.remove(file)
             return
 
+        oversized = [p for p in parts if os.path.getsize(p) > SPLIT_THRESHOLD]
+        if oversized:
+            await edit.edit(
+                f"One or more split parts exceed 2 GB (bitrate too high for safe split).\n"
+                f"Upgrade to Telegram Premium to upload files up to 4 GB without splitting."
+            )
+            for p in parts:
+                try:
+                    os.remove(p)
+                except OSError:
+                    pass
+            if os.path.isfile(file):
+                os.remove(file)
+            return
+
         original_name = os.path.basename(file)
         total = len(parts)
         first_saved_id = None
 
-        for idx, part in enumerate(parts, 1):
-            try:
-                await edit.edit(f'Uploading part {idx}/{total}...')
-                sent = await userbot.send_document(
-                    "me", part,
-                    caption=(
-                        f"Part {idx}/{total} of {original_name}\n\n"
-                        f"To rejoin:\n"
-                        f"Linux/Mac: cat '{original_name}.part.*' > '{original_name}'\n"
-                        f"Windows: copy /b '{original_name}.part.*' '{original_name}'"
-                    ),
-                    progress=progress_for_pyrogram,
-                    progress_args=(userbot, f'Uploading part {idx}/{total}...', edit, time.time())
-                )
-                if idx == 1:
-                    first_saved_id = sent.id
-            except FloodWait as fw:
-                await asyncio.sleep(fw.value)
-                await edit.edit(
-                    f'Rate limited during part {idx}/{total}. Some parts may already be uploaded.'
-                )
-                return
-            except Exception as e:
-                await edit.edit(f'Failed at part {idx}/{total}: {e}')
-                return
+        if split_method == "binary":
+            rejoin_text = (
+                f"\n\nTo rejoin:\n"
+                f"Linux/Mac: cat '{original_name}.part.*' > '{original_name}'\n"
+                f"Windows: copy /b '{original_name}.part.*' '{original_name}'"
+            )
+        else:
+            rejoin_text = ""
 
-        for p in parts:
-            try:
-                os.remove(p)
-            except OSError:
-                pass
-        if os.path.isfile(file):
-            os.remove(file)
+        upload_ok = False
+        try:
+            for idx, part in enumerate(parts, 1):
+                try:
+                    await edit.edit(f'Uploading part {idx}/{total}...')
+                    sent = await userbot.send_document(
+                        "me", part,
+                        caption=(
+                            f"Part {idx}/{total} of {original_name}"
+                            f"{rejoin_text}"
+                        ),
+                        progress=progress_for_pyrogram,
+                        progress_args=(userbot, f'Uploading part {idx}/{total}...', edit, time.time())
+                    )
+                    if idx == 1:
+                        first_saved_id = sent.id
+                except FloodWait as fw:
+                    await asyncio.sleep(fw.value)
+                    await edit.edit(
+                        f'Rate limited during part {idx}/{total}. Some parts may already be uploaded.'
+                    )
+                    return
+                except Exception as e:
+                    await edit.edit(f'Failed at part {idx}/{total}: {e}')
+                    return
+            upload_ok = True
+        finally:
+            for p in parts:
+                try:
+                    os.remove(p)
+                except OSError:
+                    pass
+            if os.path.isfile(file):
+                os.remove(file)
+
+        if not upload_ok:
+            return
+
+        if split_method == "binary":
+            final_text = f'Saved as {total} parts to your Saved Messages.\nRejoin to use.'
+        else:
+            final_text = f'Saved as {total} parts to your Saved Messages.\nEach part is independently playable.'
 
         await edit.edit(
-            f'Saved as {total} parts to your Saved Messages.\nRejoin to use.',
+            final_text,
             reply_markup=InlineKeyboardMarkup([[
                 InlineKeyboardButton('View Part 1', url=f'tg://openmessage?user_id={user_id}&message_id={first_saved_id}')
             ]])
