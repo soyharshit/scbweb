@@ -2,11 +2,11 @@ import os
 from asyncio import sleep
 from telethon import events, Button
 from telethon.errors import FloodWaitError
-from .. import bot, AUTH_USERS, MONGODB_URI
+from .. import bot, AUTH_USERS, MONGODB_URI, DB_NAME
 from main.Database.database import Database, Stats
 
-db = Database(MONGODB_URI, 'saverestricted')
-stats_db = Stats(MONGODB_URI, 'saverestricted')
+db = Database(MONGODB_URI, DB_NAME)
+stats_db = Stats(MONGODB_URI, DB_NAME)
 
 
 _processed_all = set()

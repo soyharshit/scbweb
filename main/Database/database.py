@@ -1,8 +1,8 @@
 from typing import Optional, AsyncGenerator
 import motor.motor_asyncio
-from .. import MONGODB_URI
+from .. import MONGODB_URI, DB_NAME
 
-SESSION_NAME = 'saverestricted'
+SESSION_NAME = DB_NAME
 
 
 class Database:

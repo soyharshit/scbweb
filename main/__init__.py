@@ -33,6 +33,7 @@ API_HASH = os.getenv("API_HASH", "495b0228624028d635bd748b22985f67")
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 FORCESUB = os.getenv("FORCESUB")
 MONGODB_URI = os.getenv("MONGODB_URI")
+DB_NAME = os.getenv("DB_NAME", "saverestricted")
 LOGS = getenv_int("LOGS")
 AUTH_USERS = getenv_int_list("AUTH_USERS", [7477152489])
 
@@ -40,10 +41,15 @@ if not all([API_ID, API_HASH, BOT_TOKEN]):
     logging.error("Missing API_ID, API_HASH, or BOT_TOKEN in environment.")
     sys.exit(1)
 
-bot = TelegramClient("bot", API_ID, API_HASH).start(bot_token=BOT_TOKEN)
+logging.warning(f"Bot starting | DB_NAME={DB_NAME} | CWD={os.getcwd()} | token=...{BOT_TOKEN[-8:]}")
+
+_SESSION = os.getenv("TELETHON_SESSION", f"bot_{DB_NAME}")
+_PYRO_SESSION = os.getenv("PYRO_SESSION", f"save-restricted-{DB_NAME}")
+
+bot = TelegramClient(_SESSION, API_ID, API_HASH).start(bot_token=BOT_TOKEN)
 
 Bot = Client(
-    "save-restricted-bot",
+    _PYRO_SESSION,
     bot_token=BOT_TOKEN,
     api_id=int(API_ID),
     api_hash=API_HASH

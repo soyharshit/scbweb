@@ -7,11 +7,11 @@ import logging
 from pyrogram import Client
 from pyrogram.errors import FloodWait
 from main.Database.database import Database
-from .. import API_ID, API_HASH, MONGODB_URI
+from .. import API_ID, API_HASH, MONGODB_URI, DB_NAME
 
 
 async def login(uid: int, api_id: int, api_hash: str, session: str) -> None:
-    db = Database(MONGODB_URI, 'saverestricted')
+    db = Database(MONGODB_URI, DB_NAME)
     await asyncio.gather(
         db.update_api_id(uid, api_id),
         db.update_api_hash(uid, api_hash),
@@ -20,7 +20,7 @@ async def login(uid: int, api_id: int, api_hash: str, session: str) -> None:
 
 
 async def logout(uid: int) -> None:
-    db = Database(MONGODB_URI, 'saverestricted')
+    db = Database(MONGODB_URI, DB_NAME)
     await asyncio.gather(
         db.rem_api_id(uid),
         db.rem_api_hash(uid),

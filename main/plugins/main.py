@@ -71,11 +71,21 @@ async def gen_thumb(video, out):
 async def get_msg(userbot, user_id, msg_link, edit):
     msg_id = None
     chat_ids = []
+    single_only = '?single' in msg_link
 
     try:
         if 't.me/c/' in msg_link:
-            raw_id = msg_link.split('/')[-2]
-            msg_id = int(msg_link.split('/')[-1].split('?')[0])
+            path = msg_link.split('t.me/c/', 1)[1].split('?', 1)[0]
+            segments = [s for s in path.split('/') if s]
+            if len(segments) >= 3:
+                raw_id = segments[0]
+                msg_id = int(segments[2])
+            elif len(segments) >= 2:
+                raw_id = segments[0]
+                msg_id = int(segments[1])
+            else:
+                await edit.edit('Invalid message link.')
+                return
             if raw_id.startswith('-100'):
                 chat_ids.append(int(raw_id))
             elif raw_id.startswith('100'):
@@ -107,7 +117,16 @@ async def get_msg(userbot, user_id, msg_link, edit):
         await edit.edit('Invalid message link.')
         return
 
-    if 't.me/c/' in msg_link or 't.me/b/' in msg_link:
+    for username in [c for c in chat_ids if isinstance(c, str) and not c.lstrip('-').isdigit()]:
+        try:
+            resolved = await userbot.get_chat(username)
+            rid = getattr(resolved, "id", None)
+            if rid and rid not in chat_ids:
+                chat_ids.append(rid)
+        except Exception:
+            pass
+
+    if 't.me/c/' in msg_link or 't.me/b/' in msg_link or any(isinstance(c, str) and not c.lstrip('-').isdigit() for c in chat_ids):
         try:
             user_chat_ids = set()
             async for dialog in userbot.get_dialogs(limit=500):
@@ -133,19 +152,46 @@ async def get_msg(userbot, user_id, msg_link, edit):
     for cid in chat_ids:
         try:
             msg = await userbot.get_messages(cid, msg_id)
-            if msg and (msg.media or msg.text or msg.caption):
+            if msg and not getattr(msg, 'empty', False) and (
+                msg.media or msg.text or msg.caption or msg.sticker or msg.poll
+            ):
                 break
         except Exception:
             continue
 
-    if not msg:
+    if not msg or (getattr(msg, 'empty', False) or not (msg.media or msg.text or msg.caption or msg.sticker or msg.poll)):
+        for cid in chat_ids:
+            if isinstance(cid, int):
+                try:
+                    await userbot.get_chat(cid)
+                except Exception:
+                    pass
+
+        for cid in chat_ids:
+            if not isinstance(cid, int):
+                continue
+            try:
+                async for m in userbot.get_chat_history(cid, limit=1, offset_id=msg_id + 1):
+                    if m.id == msg_id and not getattr(m, 'empty', False) and (
+                        m.media or m.text or m.caption or m.sticker or m.poll
+                    ):
+                        msg = m
+                        break
+                if msg:
+                    break
+            except Exception:
+                continue
+
+    if not msg or (getattr(msg, 'empty', False) or not (msg.media or msg.text or msg.caption or msg.sticker or msg.poll)):
         try:
             raw_id = str(msg_link.split('/')[-2]).lstrip('-100')
-            async for dialog in userbot.get_dialogs():
+            async for dialog in userbot.get_dialogs(limit=500):
                 cid = getattr(dialog.chat, 'id', None)
                 if cid and raw_id in str(abs(cid)):
                     msg = await userbot.get_messages(cid, msg_id)
-                    if msg and (msg.media or msg.text or msg.caption):
+                    if msg and not getattr(msg, 'empty', False) and (
+                        msg.media or msg.text or msg.caption or msg.sticker or msg.poll
+                    ):
                         break
         except Exception:
             pass
@@ -167,11 +213,32 @@ async def get_msg(userbot, user_id, msg_link, edit):
         return
 
     if not msg.media and not msg.text and not msg.caption and not msg.sticker and not msg.poll:
+        chat_info = ""
+        try:
+            chat_info = (
+                f"chat_id={getattr(getattr(msg, 'chat', None), 'id', '?')}, "
+                f"chat_type={getattr(getattr(msg, 'chat', None), 'type', '?')}, "
+                f"date={getattr(msg, 'date', '?')}, "
+                f"views={getattr(msg, 'views', '?')}"
+            )
+        except Exception:
+            pass
         logging.warning(
             f"No saveable content for link: {msg_link} (msg_id={msg_id}), "
             f"type={type(msg).__name__}, media={getattr(msg, 'media', None)}, "
-            f"has_text={bool(msg.text)}, has_caption={bool(msg.caption)}"
+            f"has_text={bool(msg.text)}, has_caption={bool(msg.caption)}, "
+            f"{chat_info}, chat_ids_tried={chat_ids}"
         )
+        try:
+            from main.plugins.helpers import _clients
+            ub = _clients.get(f"ub_{user_id}")
+            ub_id = getattr(getattr(ub, "me", None), "id", None) if ub else None
+            ub_premium = getattr(ub, "_is_premium", None) if ub else None
+            logging.warning(
+                f"User session info: user_id={user_id}, ub_me_id={ub_id}, ub_is_premium={ub_premium}"
+            )
+        except Exception as e:
+            logging.warning(f"Could not log user session info: {e}")
         await edit.edit(
             "Message has no saveable content.\n"
             "Supported: text, photos, videos, documents, audio, voice, stickers, animations, polls."
@@ -179,9 +246,39 @@ async def get_msg(userbot, user_id, msg_link, edit):
         return
 
     try:
-        if msg.media_group_id:
-            sent = await userbot.copy_media_group("me", msg.chat.id, msg.id)
-            saved_id = sent[0].id
+        if msg.media_group_id and not single_only:
+            try:
+                group_msgs = await userbot.get_media_group(msg.chat.id, msg.id)
+            except Exception:
+                group_msgs = [msg]
+            group_msgs = sorted(group_msgs, key=lambda m: m.id)
+            total = len(group_msgs)
+            saved_ids = []
+            for i, gm in enumerate(group_msgs):
+                try:
+                    sent = await userbot.forward_messages("me", msg.chat.id, [gm.id])
+                    saved_id = sent[0].id if isinstance(sent, list) else sent.id
+                except Exception:
+                    try:
+                        sent = await userbot.copy_message("me", msg.chat.id, gm.id)
+                        saved_id = sent.id
+                    except Exception:
+                        saved_id = None
+                if saved_id is not None:
+                    saved_ids.append(saved_id)
+                if i < total - 1:
+                    await edit.edit(
+                        f"Forwarded {i+1}/{total} from media group.\n"
+                        f"Next message in 5 minutes..."
+                    )
+                    await asyncio.sleep(300)
+            await edit.edit(
+                f"Saved {len(saved_ids)}/{total} messages to your Saved Messages.",
+                reply_markup=InlineKeyboardMarkup([[
+                    InlineKeyboardButton('View Message', url=f'tg://openmessage?user_id={user_id}&message_id={saved_ids[0]}')
+                ]])
+            )
+            return
         else:
             try:
                 sent = await userbot.forward_messages("me", msg.chat.id, [msg.id])

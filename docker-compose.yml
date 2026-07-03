@@ -8,5 +8,6 @@ services:
       BOT_TOKEN: ${BOT_TOKEN}
       FORCESUB: ${FORCESUB}
       MONGODB_URI: ${MONGODB_URI}
+      DB_NAME: ${DB_NAME}
       LOGS: ${LOGS}
       AUTH_USERS: ${AUTH_USERS}
