@@ -580,9 +580,20 @@ async def clone_handler(bot_, event: Message):
         out = await join(userbot, link)
         await init.edit(out)
     else:
+        remaining, reset_at = await db.get_download_remaining(uid)
+        if remaining <= 0:
+            user_cooldowns.pop(uid, None)
+            hrs_left = int((reset_at - time.time()) // 3600)
+            mins_left = int((reset_at - time.time()) % 3600 // 60)
+            return await init.edit(
+                f"You've used all 20 daily downloads.\n"
+                f"Resets in {hrs_left}h {mins_left}m.\n\n"
+                f"Contact @BotsCraftAdmin to buy premium for unlimited downloads."
+            )
         try:
             await get_msg(userbot, uid, link, init)
             await stats_db.increment_forwards()
+            await db.increment_download_count(uid)
         except FloodWait as fw:
             await asyncio.sleep(fw.value)
             await init.edit(f'Rate limited. Retry after {fw.value}s.')

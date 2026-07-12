@@ -1,4 +1,5 @@
 from typing import Optional, AsyncGenerator
+import time
 import motor.motor_asyncio
 from .. import MONGODB_URI, DB_NAME
 
@@ -30,7 +31,8 @@ class Database:
 
     def _new_user(self, uid: int) -> dict:
         return {'id': uid, 'banned': False, 'api_id': None,
-                'api_hash': None, 'session': None, 'log': False}
+                'api_hash': None, 'session': None, 'log': False,
+                'daily_download_count': 0, 'daily_download_reset_at': 0}
 
     async def add_user(self, uid: int) -> None:
         await self._users.update_one(
@@ -93,6 +95,32 @@ class Database:
     async def is_logged(self, uid: int) -> bool:
         user = await self._users.find_one({'id': uid})
         return user.get('log', False) if user else False
+
+    async def get_download_remaining(self, uid: int) -> tuple[int, int]:
+        user = await self._users.find_one({'id': uid})
+        if not user:
+            return 20, 0
+        now = time.time()
+        count = user.get('daily_download_count', 0)
+        reset_at = user.get('daily_download_reset_at', 0)
+        if now >= reset_at:
+            await self._update(uid, {'daily_download_count': 0, 'daily_download_reset_at': 0})
+            return 20, 0
+        remaining = max(0, 20 - count)
+        return remaining, int(reset_at)
+
+    async def increment_download_count(self, uid: int) -> None:
+        now = time.time()
+        user = await self._users.find_one({'id': uid})
+        if not user:
+            await self.add_user(uid)
+            user = {'id': uid, 'daily_download_count': 0, 'daily_download_reset_at': 0}
+        count = user.get('daily_download_count', 0)
+        reset_at = user.get('daily_download_reset_at', 0)
+        if reset_at == 0 or now >= reset_at:
+            await self._update(uid, {'daily_download_count': 1, 'daily_download_reset_at': now + 86400})
+        else:
+            await self._update(uid, {'daily_download_count': count + 1})
 
     async def set_botCreds(self, uid: int, token: str) -> None:
         await self._users.insert_one({'id': f'bot{uid}', 'bot_token': token})
