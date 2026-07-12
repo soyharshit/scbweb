@@ -26,6 +26,7 @@ MAX_SPLIT_PARTS = 2
 user_cooldowns = {}
 _dialog_cache = {}
 _ub_semaphores = {}
+_sub_cache = {}
 
 async def _get_cached_dialogs(userbot, uid):
     key = f"ub_{uid}"
@@ -46,10 +47,16 @@ async def _get_cached_dialogs(userbot, uid):
 async def is_user_subscribed(uid):
     if not FORCESUB:
         return True
+    now = time.time()
+    cached = _sub_cache.get(uid)
+    if cached and now < cached['expires_at']:
+        return cached['subscribed']
     try:
         await bot.get_chat_member(FORCESUB, uid)
+        _sub_cache[uid] = {'subscribed': True, 'expires_at': now + 3600}
         return True
     except:
+        _sub_cache[uid] = {'subscribed': False, 'expires_at': now + 300}
         return False
 
 
