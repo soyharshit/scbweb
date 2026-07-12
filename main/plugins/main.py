@@ -53,10 +53,10 @@ async def is_user_subscribed(uid):
         return cached['subscribed']
     try:
         await bot.get_chat_member(FORCESUB, uid)
-        _sub_cache[uid] = {'subscribed': True, 'expires_at': now + 3600}
+        _sub_cache[uid] = {'subscribed': True, 'expires_at': now + 300}
         return True
     except:
-        _sub_cache[uid] = {'subscribed': False, 'expires_at': now + 300}
+        _sub_cache[uid] = {'subscribed': False, 'expires_at': now + 120}
         return False
 
 
