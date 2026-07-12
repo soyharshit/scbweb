@@ -20,6 +20,10 @@ start-bot = "main.__main__:main"
 [dependency-groups]
 dev = []
 
+[tool.setuptools.packages.find]
+include = ["main*"]
+exclude = ["downloads*"]
+
 [build-system]
 requires = ["setuptools>=68.0"]
 build-backend = "setuptools.build_meta"

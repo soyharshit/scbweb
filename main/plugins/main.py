@@ -299,218 +299,217 @@ async def get_msg(userbot, user_id, msg_link, edit):
         await edit.edit('Failed to download media.')
         return
 
-    size_bytes = os.path.getsize(file)
-    size_mib = size_bytes / (1024 * 1024)
-    size_gib = size_mib / 1024
-
-    if size_bytes > MAX_FILE_SIZE:
-        await edit.edit(
-            f"File too large ({size_gib:.2f} GB). Telegram's absolute maximum is 4 GB."
-        )
-        if os.path.isfile(file):
-            os.remove(file)
-        return
-
-    is_premium = bool(getattr(userbot, "_is_premium", False))
-
-    if size_bytes > SPLIT_THRESHOLD and not is_premium:
-        is_media_file = bool(
-            msg.video or msg.video_note or msg.animation or msg.audio or msg.voice
-        )
-        mime = ""
-        if msg.document:
-            mime = (getattr(msg.document, "mime_type", "") or "").lower()
-            if mime.startswith("video/") or mime.startswith("audio/"):
-                is_media_file = True
-
-        is_binary_splittable = bool(msg.document) and not (
-            mime.startswith("video/") or mime.startswith("audio/")
-        )
-
-        if not (is_media_file or is_binary_splittable):
-            await edit.edit(
-                f"File is {size_gib:.2f} GB, which exceeds the 2 GB limit for non-Premium accounts.\n"
-                f"Photos cannot be split safely.\n"
-                f"Upgrade to Telegram Premium to upload files up to 4 GB."
-            )
-            if os.path.isfile(file):
-                os.remove(file)
-            return
-
-        await edit.edit('Splitting file...')
-        try:
-            if is_media_file:
-                if not await is_ffmpeg_available():
-                    await edit.edit(
-                        "ffmpeg is not available on the server, so this media file cannot be split.\n"
-                        "Upgrade to Telegram Premium to upload files up to 4 GB without splitting."
-                    )
-                    if os.path.isfile(file):
-                        os.remove(file)
-                    return
-                parts = await split_media_file(file, MAX_SPLIT_PARTS)
-                split_method = "ffmpeg"
-            else:
-                parts = await split_file(file, SPLIT_CHUNK_SIZE)
-                split_method = "binary"
-        except Exception as e:
-            await edit.edit(f'Split failed: {e}')
-            if os.path.isfile(file):
-                os.remove(file)
-            return
-
-        if len(parts) > MAX_SPLIT_PARTS:
-            await edit.edit(
-                f"File would split into {len(parts)} parts, exceeding the maximum of {MAX_SPLIT_PARTS}.\n"
-                f"Maximum splittable size is ~{(SPLIT_CHUNK_SIZE * MAX_SPLIT_PARTS) / (1024**3):.1f} GB.\n"
-                f"Upgrade to Telegram Premium to upload files up to 4 GB."
-            )
-            for p in parts:
-                try:
-                    os.remove(p)
-                except OSError:
-                    pass
-            if os.path.isfile(file):
-                os.remove(file)
-            return
-
-        oversized = [p for p in parts if os.path.getsize(p) > SPLIT_THRESHOLD]
-        if oversized:
-            await edit.edit(
-                f"One or more split parts exceed 2 GB (bitrate too high for safe split).\n"
-                f"Upgrade to Telegram Premium to upload files up to 4 GB without splitting."
-            )
-            for p in parts:
-                try:
-                    os.remove(p)
-                except OSError:
-                    pass
-            if os.path.isfile(file):
-                os.remove(file)
-            return
-
-        original_name = os.path.basename(file)
-        total = len(parts)
-        first_saved_id = None
-
-        if split_method == "binary":
-            rejoin_text = (
-                f"\n\nTo rejoin:\n"
-                f"Linux/Mac: cat '{original_name}.part.*' > '{original_name}'\n"
-                f"Windows: copy /b '{original_name}.part.*' '{original_name}'"
-            )
-        else:
-            rejoin_text = ""
-
-        upload_ok = False
-        try:
-            for idx, part in enumerate(parts, 1):
-                try:
-                    await edit.edit(f'Uploading part {idx}/{total}...')
-                    sent = await userbot.send_document(
-                        "me", part,
-                        caption=(
-                            f"Part {idx}/{total} of {original_name}"
-                            f"{rejoin_text}"
-                        ),
-                        progress=progress_for_pyrogram,
-                        progress_args=(userbot, f'Uploading part {idx}/{total}...', edit, time.time())
-                    )
-                    if idx == 1:
-                        first_saved_id = sent.id
-                except FloodWait as fw:
-                    await asyncio.sleep(fw.value)
-                    await edit.edit(
-                        f'Rate limited during part {idx}/{total}. Some parts may already be uploaded.'
-                    )
-                    return
-                except Exception as e:
-                    await edit.edit(f'Failed at part {idx}/{total}: {e}')
-                    return
-            upload_ok = True
-        finally:
-            for p in parts:
-                try:
-                    os.remove(p)
-                except OSError:
-                    pass
-            if os.path.isfile(file):
-                os.remove(file)
-
-        if not upload_ok:
-            return
-
-        if split_method == "binary":
-            final_text = f'Saved as {total} parts to your Saved Messages.\nRejoin to use.'
-        else:
-            final_text = f'Saved as {total} parts to your Saved Messages.\nEach part is independently playable.'
-
-        await edit.edit(
-            final_text,
-            reply_markup=InlineKeyboardMarkup([[
-                InlineKeyboardButton('View Part 1', url=f'tg://openmessage?user_id={user_id}&message_id={first_saved_id}')
-            ]])
-        )
-        return
-
-    caption = msg.caption or ''
-    entities = msg.caption_entities
-    await edit.edit('Uploading...')
-    saved_id = None
-
     try:
-        if msg.video_note:
-            meta = video_meta(file)
-            thumb = await gen_thumb(file, f'{user_id}.jpg')
-            sent = await userbot.send_video_note(
-                "me", file, length=meta['height'], duration=meta['duration'],
-                thumb=thumb, progress=progress_for_pyrogram,
-                progress_args=(userbot, 'Uploading...', edit, time.time())
-            )
-            saved_id = sent.id
-        elif msg.video:
-            meta = video_meta(file)
-            thumb = await gen_thumb(file, f'{user_id}.jpg')
-            sent = await userbot.send_video(
-                "me", file, caption=caption, caption_entities=entities,
-                duration=meta['duration'], width=meta['width'], height=meta['height'],
-                thumb=thumb, progress=progress_for_pyrogram,
-                progress_args=(userbot, 'Uploading...', edit, time.time())
-            )
-            saved_id = sent.id
-        elif msg.photo:
-            sent = await userbot.send_photo("me", file, caption=caption, caption_entities=entities)
-            saved_id = sent.id
-        elif msg.audio:
-            sent = await userbot.send_audio("me", file, caption=caption, caption_entities=entities,
-                                             progress=progress_for_pyrogram,
-                                             progress_args=(userbot, 'Uploading...', edit, time.time()))
-            saved_id = sent.id
-        else:
-            sent = await userbot.send_document("me", file, caption=caption, caption_entities=entities,
-                                                progress=progress_for_pyrogram,
-                                                progress_args=(userbot, 'Uploading...', edit, time.time()))
-            saved_id = sent.id
-    except FloodWait as fw:
-        await asyncio.sleep(fw.value)
-        await edit.edit(f'Rate limited. Retry after {fw.value} seconds.')
-    except Exception as e:
-        err = str(e)
-        if "2000" in err and ("MiB" in err or "MB" in err or "megab" in err.lower()):
+        size_bytes = os.path.getsize(file)
+        size_mib = size_bytes / (1024 * 1024)
+        size_gib = size_mib / 1024
+
+        if size_bytes > MAX_FILE_SIZE:
             await edit.edit(
-                f"Upload failed: file exceeds the 2 GB limit for non-Premium accounts.\n"
-                f"Upgrade to Telegram Premium to upload files up to 4 GB."
+                f"File too large ({size_gib:.2f} GB). Telegram's absolute maximum is 4 GB."
             )
+            return
+
+        is_premium = bool(getattr(userbot, "_is_premium", False))
+
+        if size_bytes > SPLIT_THRESHOLD and not is_premium:
+            is_media_file = bool(
+                msg.video or msg.video_note or msg.animation or msg.audio or msg.voice
+            )
+            mime = ""
+            if msg.document:
+                mime = (getattr(msg.document, "mime_type", "") or "").lower()
+                if mime.startswith("video/") or mime.startswith("audio/"):
+                    is_media_file = True
+
+            is_binary_splittable = bool(msg.document) and not (
+                mime.startswith("video/") or mime.startswith("audio/")
+            )
+
+            if not (is_media_file or is_binary_splittable):
+                await edit.edit(
+                    f"File is {size_gib:.2f} GB, which exceeds the 2 GB limit for non-Premium accounts.\n"
+                    f"Photos cannot be split safely.\n"
+                    f"Upgrade to Telegram Premium to upload files up to 4 GB."
+                )
+                return
+
+            await edit.edit('Splitting file...')
+            try:
+                if is_media_file:
+                    if not await is_ffmpeg_available():
+                        await edit.edit(
+                            "ffmpeg is not available on the server, so this media file cannot be split.\n"
+                            "Upgrade to Telegram Premium to upload files up to 4 GB without splitting."
+                        )
+                        return
+                    parts = await split_media_file(file, MAX_SPLIT_PARTS)
+                    split_method = "ffmpeg"
+                else:
+                    parts = await split_file(file, SPLIT_CHUNK_SIZE)
+                    split_method = "binary"
+            except Exception as e:
+                await edit.edit(f'Split failed: {e}')
+                return
+
+            if len(parts) > MAX_SPLIT_PARTS:
+                await edit.edit(
+                    f"File would split into {len(parts)} parts, exceeding the maximum of {MAX_SPLIT_PARTS}.\n"
+                    f"Maximum splittable size is ~{(SPLIT_CHUNK_SIZE * MAX_SPLIT_PARTS) / (1024**3):.1f} GB.\n"
+                    f"Upgrade to Telegram Premium to upload files up to 4 GB."
+                )
+                for p in parts:
+                    try:
+                        os.remove(p)
+                    except OSError:
+                        pass
+                return
+
+            oversized = [p for p in parts if os.path.getsize(p) > SPLIT_THRESHOLD]
+            if oversized:
+                await edit.edit(
+                    f"One or more split parts exceed 2 GB (bitrate too high for safe split).\n"
+                    f"Upgrade to Telegram Premium to upload files up to 4 GB without splitting."
+                )
+                for p in parts:
+                    try:
+                        os.remove(p)
+                    except OSError:
+                        pass
+                return
+
+            original_name = os.path.basename(file)
+            total = len(parts)
+            first_saved_id = None
+
+            if split_method == "binary":
+                rejoin_text = (
+                    f"\n\nTo rejoin:\n"
+                    f"Linux/Mac: cat '{original_name}.part.*' > '{original_name}'\n"
+                    f"Windows: copy /b '{original_name}.part.*' '{original_name}'"
+                )
+            else:
+                rejoin_text = ""
+
+            upload_ok = False
+            try:
+                for idx, part in enumerate(parts, 1):
+                    try:
+                        await edit.edit(f'Uploading part {idx}/{total}...')
+                        sent = await userbot.send_document(
+                            "me", part,
+                            caption=(
+                                f"Part {idx}/{total} of {original_name}"
+                                f"{rejoin_text}"
+                            ),
+                            progress=progress_for_pyrogram,
+                            progress_args=(userbot, f'Uploading part {idx}/{total}...', edit, time.time())
+                        )
+                        if idx == 1:
+                            first_saved_id = sent.id
+                    except FloodWait as fw:
+                        await asyncio.sleep(fw.value)
+                        await edit.edit(
+                            f'Rate limited during part {idx}/{total}. Some parts may already be uploaded.'
+                        )
+                        return
+                    except Exception as e:
+                        await edit.edit(f'Failed at part {idx}/{total}: {e}')
+                        return
+                upload_ok = True
+            finally:
+                for p in parts:
+                    try:
+                        os.remove(p)
+                    except OSError:
+                        pass
+
+            if not upload_ok:
+                return
+
+            if split_method == "binary":
+                final_text = f'Saved as {total} parts to your Saved Messages.\nRejoin to use.'
+            else:
+                final_text = f'Saved as {total} parts to your Saved Messages.\nEach part is independently playable.'
+
+            await edit.edit(
+                final_text,
+                reply_markup=InlineKeyboardMarkup([[
+                    InlineKeyboardButton('View Part 1', url=f'tg://openmessage?user_id={user_id}&message_id={first_saved_id}')
+                ]])
+            )
+            return
+
+        caption = msg.caption or ''
+        entities = msg.caption_entities
+        await edit.edit('Uploading...')
+        saved_id = None
+
+        try:
+            if msg.video_note:
+                meta = video_meta(file)
+                thumb = await gen_thumb(file, f'{user_id}.jpg')
+                sent = await userbot.send_video_note(
+                    "me", file, length=meta['height'], duration=meta['duration'],
+                    thumb=thumb, progress=progress_for_pyrogram,
+                    progress_args=(userbot, 'Uploading...', edit, time.time())
+                )
+                saved_id = sent.id
+            elif msg.video:
+                meta = video_meta(file)
+                thumb = await gen_thumb(file, f'{user_id}.jpg')
+                sent = await userbot.send_video(
+                    "me", file, caption=caption, caption_entities=entities,
+                    duration=meta['duration'], width=meta['width'], height=meta['height'],
+                    thumb=thumb, progress=progress_for_pyrogram,
+                    progress_args=(userbot, 'Uploading...', edit, time.time())
+                )
+                saved_id = sent.id
+            elif msg.photo:
+                sent = await userbot.send_photo("me", file, caption=caption, caption_entities=entities)
+                saved_id = sent.id
+            elif msg.audio:
+                sent = await userbot.send_audio("me", file, caption=caption, caption_entities=entities,
+                                                 progress=progress_for_pyrogram,
+                                                 progress_args=(userbot, 'Uploading...', edit, time.time()))
+                saved_id = sent.id
+            else:
+                sent = await userbot.send_document("me", file, caption=caption, caption_entities=entities,
+                                                    progress=progress_for_pyrogram,
+                                                    progress_args=(userbot, 'Uploading...', edit, time.time()))
+                saved_id = sent.id
+        except FloodWait as fw:
+            await asyncio.sleep(fw.value)
+            await edit.edit(f'Rate limited. Retry after {fw.value} seconds.')
+        except Exception as e:
+            err = str(e)
+            if "2000" in err and ("MiB" in err or "MB" in err or "megab" in err.lower()):
+                await edit.edit(
+                    f"Upload failed: file exceeds the 2 GB limit for non-Premium accounts.\n"
+                    f"Upgrade to Telegram Premium to upload files up to 4 GB."
+                )
+            else:
+                await edit.edit(f'Upload failed: {e}')
         else:
-            await edit.edit(f'Upload failed: {e}')
-    else:
-        await edit.edit('Saved to your Saved Messages.', reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton('View Message', url=f'tg://openmessage?user_id={user_id}&message_id={saved_id}')]]))
+            await edit.edit('Saved to your Saved Messages.', reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton('View Message', url=f'tg://openmessage?user_id={user_id}&message_id={saved_id}')]]))
+        finally:
+            if os.path.isfile(file):
+                os.remove(file)
+            thumb_path = f'{user_id}.jpg'
+            if os.path.isfile(thumb_path):
+                os.remove(thumb_path)
     finally:
         if os.path.isfile(file):
-            os.remove(file)
+            try:
+                os.remove(file)
+            except OSError:
+                pass
         thumb_path = f'{user_id}.jpg'
         if os.path.isfile(thumb_path):
-            os.remove(thumb_path)
+            try:
+                os.remove(thumb_path)
+            except OSError:
+                pass
 
 
 @Bot.on_message(filters.private & filters.incoming)
