@@ -1,6 +1,7 @@
 import os
 import time
 import asyncio
+import random
 import cv2
 import logging
 from pyrogram import Client, filters
@@ -23,7 +24,23 @@ SPLIT_CHUNK_SIZE = 1900 * 1024 * 1024
 MAX_SPLIT_PARTS = 2
 
 user_cooldowns = {}
+_dialog_cache = {}
+_ub_semaphores = {}
 
+async def _get_cached_dialogs(userbot, uid):
+    key = f"ub_{uid}"
+    now = time.time()
+    cached = _dialog_cache.get(key)
+    if cached and now < cached['expires_at']:
+        return cached['chat_ids']
+    chat_ids = set()
+    async for dialog in userbot.get_dialogs(limit=500):
+        cid = getattr(dialog.chat, 'id', None)
+        if cid is not None:
+            chat_ids.add(cid)
+            chat_ids.add(abs(cid))
+    _dialog_cache[key] = {'chat_ids': chat_ids, 'expires_at': now + 300}
+    return chat_ids
 
 
 async def is_user_subscribed(uid):
@@ -128,12 +145,7 @@ async def get_msg(userbot, user_id, msg_link, edit):
 
     if 't.me/c/' in msg_link or 't.me/b/' in msg_link or any(isinstance(c, str) and not c.lstrip('-').isdigit() for c in chat_ids):
         try:
-            user_chat_ids = set()
-            async for dialog in userbot.get_dialogs(limit=500):
-                cid = getattr(dialog.chat, 'id', None)
-                if cid is not None:
-                    user_chat_ids.add(cid)
-                    user_chat_ids.add(abs(cid))
+            user_chat_ids = await _get_cached_dialogs(userbot, user_id)
 
             int_chat_ids = [cid for cid in chat_ids if isinstance(cid, int)]
             if int_chat_ids and not any(
@@ -185,9 +197,9 @@ async def get_msg(userbot, user_id, msg_link, edit):
     if not msg or (getattr(msg, 'empty', False) or not (msg.media or msg.text or msg.caption or msg.sticker or msg.poll)):
         try:
             raw_id = str(msg_link.split('/')[-2]).lstrip('-100')
-            async for dialog in userbot.get_dialogs(limit=500):
-                cid = getattr(dialog.chat, 'id', None)
-                if cid and raw_id in str(abs(cid)):
+            cached_ids = await _get_cached_dialogs(userbot, user_id)
+            for cid in cached_ids:
+                if raw_id in str(abs(cid)):
                     msg = await userbot.get_messages(cid, msg_id)
                     if msg and not getattr(msg, 'empty', False) and (
                         msg.media or msg.text or msg.caption or msg.sticker or msg.poll
@@ -246,6 +258,7 @@ async def get_msg(userbot, user_id, msg_link, edit):
         return
 
     try:
+        await asyncio.sleep(random.uniform(0.5, 2))
         if msg.media_group_id and not single_only:
             try:
                 group_msgs = await userbot.get_media_group(msg.chat.id, msg.id)
@@ -290,6 +303,7 @@ async def get_msg(userbot, user_id, msg_link, edit):
     except Exception:
         pass
 
+    await asyncio.sleep(random.uniform(0.5, 2))
     file = await userbot.download_media(
         msg,
         progress=progress_for_pyrogram,
@@ -444,6 +458,7 @@ async def get_msg(userbot, user_id, msg_link, edit):
         entities = msg.caption_entities
         await edit.edit('Uploading...')
         saved_id = None
+        await asyncio.sleep(random.uniform(0.5, 2))
 
         try:
             if msg.video_note:
@@ -576,29 +591,32 @@ async def clone_handler(bot_, event: Message):
             user_cooldowns.pop(uid, None)
             return await init.edit(f'User session error: {e}')
 
-    if 't.me/+' in link or 't.me/joinchat/' in link:
-        out = await join(userbot, link)
-        await init.edit(out)
-    else:
-        remaining, reset_at = await db.get_download_remaining(uid)
-        if remaining <= 0:
-            user_cooldowns.pop(uid, None)
-            hrs_left = int((reset_at - time.time()) // 3600)
-            mins_left = int((reset_at - time.time()) % 3600 // 60)
-            return await init.edit(
-                f"You've used all 20 daily downloads.\n"
-                f"Resets in {hrs_left}h {mins_left}m.\n\n"
-                f"Contact @BotsCraftAdmin to buy premium for unlimited downloads."
-            )
-        try:
-            await get_msg(userbot, uid, link, init)
-            await stats_db.increment_forwards()
-            await db.increment_download_count(uid)
-        except FloodWait as fw:
-            await asyncio.sleep(fw.value)
-            await init.edit(f'Rate limited. Retry after {fw.value}s.')
-        except Exception as e:
-            user_cooldowns.pop(uid, None)
-            await init.edit(f'Error: {e}')
+    sem = _ub_semaphores.setdefault(uid, asyncio.Semaphore(1))
+    async with sem:
+        await asyncio.sleep(random.uniform(0.3, 1.5))
+        if 't.me/+' in link or 't.me/joinchat/' in link:
+            out = await join(userbot, link)
+            await init.edit(out)
+        else:
+            remaining, reset_at = await db.get_download_remaining(uid)
+            if remaining <= 0:
+                user_cooldowns.pop(uid, None)
+                hrs_left = int((reset_at - time.time()) // 3600)
+                mins_left = int((reset_at - time.time()) % 3600 // 60)
+                return await init.edit(
+                    f"You've used all 20 daily downloads.\n"
+                    f"Resets in {hrs_left}h {mins_left}m.\n\n"
+                    f"Contact @BotsCraftAdmin to buy premium for unlimited downloads."
+                )
+            try:
+                await get_msg(userbot, uid, link, init)
+                await stats_db.increment_forwards()
+                await db.increment_download_count(uid)
+            except FloodWait as fw:
+                await asyncio.sleep(fw.value)
+                await init.edit(f'Rate limited. Retry after {fw.value}s.')
+            except Exception as e:
+                user_cooldowns.pop(uid, None)
+                await init.edit(f'Error: {e}')
 
 
