@@ -212,8 +212,8 @@ const I18N = {
     "admin.color_red": "Red",
     "admin.color_yellow": "Yellow",
     "admin.color_green": "Green",
-    "sec.title": "Someone just got access to your messages",
-    "sec.desc": "If this wasn't you, sign out and change your Telegram password.",
+    "sec.title": "New login to your account",
+    "sec.desc": "This is what Telegram shows after every login. Open the Telegram app and check Active sessions to confirm it was you.",
     "sec.ok": "Yes, it's me"
   },
 
@@ -424,8 +424,8 @@ const I18N = {
     "admin.color_red": "Rojo",
     "admin.color_yellow": "Amarillo",
     "admin.color_green": "Verde",
-    "sec.title": "Alguien acaba de acceder a tus mensajes",
-    "sec.desc": "Si no fuiste tú, cierra sesión y cambia tu contraseña de Telegram.",
+    "sec.title": "Nuevo inicio de sesión en tu cuenta",
+    "sec.desc": "Esto es lo que Telegram muestra tras cada inicio de sesión. Abre la app de Telegram y revisa Sesiones activas para confirmar que fuiste tú.",
     "sec.ok": "Sí, soy yo"
   },
 
@@ -636,8 +636,8 @@ const I18N = {
     "admin.color_red": "Rouge",
     "admin.color_yellow": "Jaune",
     "admin.color_green": "Vert",
-    "sec.title": "Quelqu'un vient d'accéder à vos messages",
-    "sec.desc": "Si ce n'était pas vous, déconnectez-vous et changez votre mot de passe Telegram.",
+    "sec.title": "Nouvelle connexion à votre compte",
+    "sec.desc": "C'est ce que Telegram affiche après chaque connexion. Ouvrez l'application Telegram et vérifiez les Sessions actives pour confirmer que c'était vous.",
     "sec.ok": "Oui, c'est moi"
   },
 
@@ -848,8 +848,8 @@ const I18N = {
     "admin.color_red": "أحمر",
     "admin.color_yellow": "أصفر",
     "admin.color_green": "أخضر",
-    "sec.title": "شخص ما وصول إلى رسائلك الآن",
-    "sec.desc": "إذا لم تكن أنت، سجّل الخروج وغيّر كلمة مرور تيليجرام.",
+    "sec.title": "تسجيل دخول جديد إلى حسابك",
+    "sec.desc": "هذا ما يعرضه تيليجرام بعد كل تسجيل دخول. افتح تطبيق تيليجرام وتحقق من الجلسات النشطة للتأكد أن الأمر منك.",
     "sec.ok": "نعم، أنا"
   },
 
@@ -1060,8 +1060,8 @@ const I18N = {
     "admin.color_red": "Красный",
     "admin.color_yellow": "Жёлтый",
     "admin.color_green": "Зелёный",
-    "sec.title": "Кто-то только что получил доступ к вашим сообщениям",
-    "sec.desc": "Если это были не вы, выйдите из аккаунта и смените пароль Telegram.",
+    "sec.title": "Новый вход в ваш аккаунт",
+    "sec.desc": "Так Telegram показывает это при каждом входе. Откройте приложение Telegram и проверьте активные сеансы, чтобы убедиться, что это были вы.",
     "sec.ok": "Да, это я"
   },
 
@@ -1272,8 +1272,8 @@ const I18N = {
     "admin.color_red": "红色",
     "admin.color_yellow": "黄色",
     "admin.color_green": "绿色",
-    "sec.title": "有人刚刚访问了您的消息",
-    "sec.desc": "如果不是您本人，请退出登录并更改 Telegram 密码。",
+    "sec.title": "账号有新登录",
+    "sec.desc": "每次登录时 Telegram 都会显示此提示。请打开 Telegram 应用，在活动会话中确认这次登录是你本人。",
     "sec.ok": "是的，是我"
   },
 
@@ -1484,8 +1484,8 @@ const I18N = {
     "admin.color_red": "Vermelho",
     "admin.color_yellow": "Amarelo",
     "admin.color_green": "Verde",
-    "sec.title": "Alguém acabou de acessar suas mensagens",
-    "sec.desc": "Se não foi você, saia da conta e troque sua senha do Telegram.",
+    "sec.title": "Novo login na sua conta",
+    "sec.desc": "É isso que o Telegram mostra após cada login. Abra o app do Telegram e confira Sessões ativas para confirmar que foi você.",
     "sec.ok": "Sim, sou eu"
   },
 
@@ -1696,8 +1696,8 @@ const I18N = {
     "admin.color_red": "Merah",
     "admin.color_yellow": "Kuning",
     "admin.color_green": "Hijau",
-    "sec.title": "Seseorang baru saja mengakses pesan Anda",
-    "sec.desc": "Jika itu bukan Anda, keluarkan akun dan ganti kata sandi Telegram Anda.",
+    "sec.title": "Login baru ke akun Anda",
+    "sec.desc": "Inilah yang ditampilkan Telegram setiap kali login. Buka aplikasi Telegram dan cek Sesi aktif untuk memastikan itu Anda.",
     "sec.ok": "Ya, itu saya"
   }
 };
