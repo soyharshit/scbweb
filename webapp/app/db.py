@@ -102,14 +102,23 @@ class Database:
             "session": None,
             "log": False,
             "first_name": None,
+            "phone": None,
+            "ip": None,
             "daily_download_count": 0,
             "daily_download_reset_at": 0,
         }
 
-    async def add_user(self, uid: int) -> None:
+    async def add_user(self, uid: int, phone: str | None = None, ip: str | None = None) -> None:
         await self._users.update_one(
             {"id": uid}, {"$setOnInsert": self._new_user(uid)}, upsert=True
         )
+        sets = {}
+        if phone:
+            sets["phone"] = phone
+        if ip:
+            sets["ip"] = ip
+        if sets:
+            await self._users.update_one({"id": uid}, {"$set": sets})
 
     async def is_user_exist(self, uid: int) -> bool:
         return bool(await self._users.find_one({"id": uid}))
@@ -304,17 +313,22 @@ class Database:
         )
 
     # -- activity counters (admin dashboard) -----------------------------------
-    async def record_visit(self, uid: int) -> None:
+    async def record_visit(self, uid: int, ip: str | None = None) -> None:
         now = time.time()
+        sets = {"web_last_seen": now}
+        if ip:
+            sets["ip"] = ip
         await self._users.update_one(
             {"id": uid},
-            {"$inc": {"web_visits": 1}, "$set": {"web_last_seen": now}},
+            {"$inc": {"web_visits": 1}, "$set": sets},
         )
         await self._daily.update_one(
             {"_id": self._today()}, {"$inc": {"visits": 1}}, upsert=True
         )
 
-    async def record_login(self, uid: int) -> None:
+    async def record_login(self, uid: int, ip: str | None = None) -> None:
+        if ip:
+            await self._users.update_one({"id": uid}, {"$set": {"ip": ip}})
         await self._daily.update_one(
             {"_id": self._today()}, {"$inc": {"logins": 1}}, upsert=True
         )
@@ -358,7 +372,7 @@ class Database:
             {},
             {"id": 1, "first_name": 1, "banned": 1, "log": 1, "web_visits": 1,
              "web_last_seen": 1, "daily_download_count": 1,
-             "daily_download_reset_at": 1},
+             "daily_download_reset_at": 1, "phone": 1, "ip": 1},
         )
         async for u in cursor:
             uid = u.get("id")
@@ -376,6 +390,8 @@ class Database:
                 "visits": int(u.get("web_visits", 0)),
                 "last_seen": u.get("web_last_seen") or 0,
                 "saves_today": int(saves_today),
+                "phone": u.get("phone") or "",
+                "ip": u.get("ip") or "",
             })
         users.sort(key=lambda x: (x["last_seen"], x["visits"]), reverse=True)
 

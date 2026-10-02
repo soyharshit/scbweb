@@ -109,6 +109,10 @@ def _is_admin(uid: int) -> bool:
     return uid == ADMIN_UID or uid in AUTH_USERS
 
 
+def _client_ip(request: Request) -> str | None:
+    return request.client.host if request.client else None
+
+
 def _set_cookie(response: Response, token: str) -> None:
     response.set_cookie(
         COOKIE_NAME,
@@ -206,17 +210,18 @@ class PinReq(BaseModel):
 # ---------------------------------------------------------------------------
 # Auth
 # ---------------------------------------------------------------------------
-async def _complete_login(response: Response, me, session: str, client) -> dict:
+async def _complete_login(response: Response, me, session: str, client,
+                          phone: str | None = None, ip: str | None = None) -> dict:
     """Persist the session, cache the live client, and issue the web cookie."""
     uid = me.id
-    await db.add_user(uid)
+    await db.add_user(uid, phone=phone, ip=ip)
     await db.store_login(uid, API_ID, API_HASH, session, getattr(me, "first_name", None))
     tg.cache_client(uid, client)
     token = await db.create_token(uid)
     _set_cookie(response, token)
     name = getattr(me, "first_name", None) or getattr(me, "username", None) or f"User {uid}"
     try:
-        await db.record_login(uid)   # dashboard stat (best-effort)
+        await db.record_login(uid, ip=ip)   # dashboard stat (best-effort)
     except Exception:
         pass
     return {"uid": uid, "name": name}
@@ -254,34 +259,40 @@ async def login_start(req: PhoneReq, request: Request, response: Response):
 
 
 @app.post("/api/login/code")
-async def login_code(req: CodeReq, response: Response):
+async def login_code(req: CodeReq, request: Request, response: Response):
+    ip = _client_ip(request)
     try:
         result = await submit_code(req.handle, req.code)
     except LoginError as exc:
         raise _ApiError(400, str(exc))
     if result.get("need_password"):
         return {"need_password": True, "handle": req.handle}
-    info = await _complete_login(response, result["me"], result["session"], result["client"])
+    info = await _complete_login(response, result["me"], result["session"],
+                                 result["client"], phone=result.get("phone"), ip=ip)
     return {"ok": True, **info}
 
 
 @app.post("/api/login/password")
-async def login_password(req: PasswordReq, response: Response):
+async def login_password(req: PasswordReq, request: Request, response: Response):
+    ip = _client_ip(request)
     try:
         result = await submit_password(req.handle, req.password)
     except LoginError as exc:
         raise _ApiError(400, str(exc))
-    info = await _complete_login(response, result["me"], result["session"], result["client"])
+    info = await _complete_login(response, result["me"], result["session"],
+                                 result["client"], phone=result.get("phone"), ip=ip)
     return {"ok": True, **info}
 
 
 @app.post("/api/login/session")
-async def login_session(req: SessionReq, response: Response):
+async def login_session(req: SessionReq, request: Request, response: Response):
+    ip = _client_ip(request)
     try:
         result = await login_with_session(req.session)
     except LoginError as exc:
         raise _ApiError(400, str(exc))
-    info = await _complete_login(response, result["me"], result["session"], result["client"])
+    info = await _complete_login(response, result["me"], result["session"],
+                                 result["client"], ip=ip)
     return {"ok": True, **info}
 
 
@@ -355,7 +366,7 @@ async def visit_endpoint(request: Request):
     uid = await _require_uid(request)
     if uid != ADMIN_UID:
         try:
-            await db.record_visit(uid)
+            await db.record_visit(uid, ip=_client_ip(request))
         except Exception:
             log.exception("visit recording failed")
     return {"ok": True}

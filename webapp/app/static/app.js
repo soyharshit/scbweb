@@ -660,7 +660,10 @@ function renderUsers(users) {
     name.title = String(u.uid);
     const meta = document.createElement("div");
     meta.className = "user-meta";
-    const parts = [t("admin.meta_visits", { n: u.visits || 0 })];
+    const parts = [];
+    if (u.phone) parts.push(escapeHtml(u.phone));
+    if (u.ip) parts.push(escapeHtml(u.ip));
+    parts.push(t("admin.meta_visits", { n: u.visits || 0 }));
     if (u.saves_today) parts.push(t("admin.meta_saves", { n: u.saves_today }));
     parts.push(u.last_seen ? timeAgo(u.last_seen) : t("admin.never"));
     if (u.banned) parts.push(t("admin.stat_banned"));

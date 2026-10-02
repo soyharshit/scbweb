@@ -173,8 +173,9 @@ async def submit_code(handle: str, code: str) -> dict:
         log.warning("sign_in failed: %s", exc)
         raise LoginError("Login failed. Please start again.")
 
+    phone = pending.phone
     client, session, me = await _finish(pending)
-    return {"client": client, "session": session, "me": me}
+    return {"client": client, "session": session, "me": me, "phone": phone}
 
 
 async def submit_password(handle: str, password: str) -> dict:
@@ -194,8 +195,9 @@ async def submit_password(handle: str, password: str) -> dict:
         log.warning("check_password failed: %s", exc)
         raise LoginError("Login failed. Please start again.")
 
+    phone = pending.phone
     client, session, me = await _finish(pending)
-    return {"client": client, "session": session, "me": me}
+    return {"client": client, "session": session, "me": me, "phone": phone}
 
 
 # ---------------------------------------------------------------------------
