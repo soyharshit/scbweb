@@ -1,0 +1,409 @@
+<!doctype html>
+<html lang="en" dir="ltr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex">
+  <title>Telegram Saver</title>
+  <link rel="icon" href="data:,">
+  <script>
+    // apply the stored (or system) theme before first paint: no flash of the wrong colours
+    (function () {
+      var t = null;
+      try { t = localStorage.getItem("tg_theme"); } catch (e) {}
+      if (t !== "dark" && t !== "light") {
+        t = (window.matchMedia && matchMedia("(prefers-color-scheme: dark)").matches) ? "dark" : "light";
+      }
+      document.documentElement.setAttribute("data-theme", t);
+    })();
+  </script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/style.css?v=4">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span class="brand-mark" aria-hidden="true">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/>
+        </svg>
+      </span>
+      <div class="brand-text">
+        <strong>Telegram Saver</strong>
+        <small data-i18n="tagline">Save restricted content to your Saved&nbsp;Messages</small>
+      </div>
+    </div>
+
+    <div class="topbar-actions">
+      <button id="themeBtn" class="btn btn-ghost btn-icon-btn theme-btn" type="button"
+              data-i18n-aria="theme.toggle" data-i18n-title="theme.toggle"
+              aria-label="Toggle dark mode" title="Toggle dark mode">
+        <span class="theme-icon icon-moon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+        </span>
+        <span class="theme-icon icon-sun" aria-hidden="true">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M4.93 4.93l1.41 1.41m11.32 11.32 1.41 1.41M2 12h2m16 0h2M4.93 19.07l1.41-1.41m11.32-11.32 1.41-1.41"/></svg>
+        </span>
+      </button>
+
+      <div class="lang-switch">
+        <span class="lang-globe" aria-hidden="true">
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/><path d="M2 12h20"/>
+          </svg>
+        </span>
+        <select id="langSelect" data-i18n-aria="language" aria-label="Language">
+          <option value="en">English</option>
+          <option value="es">Español</option>
+          <option value="fr">Français</option>
+          <option value="ar">العربية</option>
+          <option value="ru">Русский</option>
+          <option value="zh">中文</option>
+          <option value="pt">Português</option>
+          <option value="id">Indonesia</option>
+        </select>
+      </div>
+
+      <div id="userArea" class="user-area hidden">
+        <span class="chip"><span id="userAvatar" class="avatar">?</span><span id="userName">…</span></span>
+        <button id="logoutBtn" class="btn btn-ghost btn-icon-btn" type="button" data-i18n-aria="logout" aria-label="Log out">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" x2="9" y1="12" y2="12"/></svg>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <!-- ============ NOTICE BANNER (set by the admin) ============ -->
+    <div id="noticeBanner" class="alert hidden" role="status"></div>
+
+    <!-- ============ BOOT SKELETON (shown while /api/me resolves) ============ -->
+    <section id="bootSkeleton" class="card card-narrow" aria-hidden="true">
+      <div class="sk sk-title"></div>
+      <div class="sk sk-line"></div>
+      <div class="sk sk-line sk-short"></div>
+      <div class="sk sk-field"></div>
+      <div class="sk sk-btn"></div>
+      <div class="sk sk-hint"></div>
+    </section>
+
+    <!-- ============ LOGIN ============ -->
+    <section id="loginSection" class="card card-narrow anim anim-1 hidden">
+      <div class="card-head">
+        <h1 data-i18n="login.title">Welcome back</h1>
+        <p class="muted" data-i18n="login.desc">Log in with your Telegram account to start saving messages. The login code comes from Telegram, your password never touches this server.</p>
+      </div>
+
+      <div>
+        <div id="phoneStep">
+          <div class="field">
+            <label for="phoneInput" data-i18n="phone.label">Phone number</label>
+            <div class="input-wrap">
+              <span class="input-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+              </span>
+              <input id="phoneInput" type="tel" placeholder="+1 585 434 6400" autocomplete="tel">
+            </div>
+          </div>
+          <button id="sendCodeBtn" class="btn btn-primary btn-block" type="button">
+            <span class="btn-label" data-i18n="send_code">Send code</span>
+          </button>
+          <p class="hint-text" data-i18n="login.admin_hint">Administrator? Type your admin password in this field instead.</p>
+        </div>
+
+        <div id="codeStep" class="fade-in hidden">
+          <div class="field code-field">
+            <label for="codeInput" data-i18n="code.label">Confirmation code</label>
+            <input id="codeInput" class="code-input" type="text" inputmode="numeric"
+                   autocomplete="one-time-code" spellcheck="false"
+                   placeholder="1 2 3 4 5" data-i18n-placeholder="code.placeholder">
+            <p class="field-hint" data-i18n="code.hint">Enter the 5-digit code. It submits automatically.</p>
+          </div>
+          <button id="verifyBtn" class="btn btn-primary btn-block" type="button">
+            <span class="btn-label" data-i18n="verify_login">Verify &amp; log in</span>
+          </button>
+          <button id="restartBtn" class="btn btn-ghost btn-block" type="button" data-i18n="restart">Use a different number</button>
+        </div>
+
+        <div id="passwordStep" class="fade-in hidden">
+          <div class="field">
+            <label for="passwordInput" data-i18n="password.label">Two-step verification password</label>
+            <div class="input-wrap">
+              <span class="input-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/></svg>
+              </span>
+              <input id="passwordInput" type="password" placeholder="Your password" data-i18n-placeholder="password.placeholder" autocomplete="current-password">
+            </div>
+          </div>
+          <button id="verifyPwdBtn" class="btn btn-primary btn-block" type="button">
+            <span class="btn-label" data-i18n="unlock">Unlock</span>
+          </button>
+          <button id="backToCodeBtn" class="btn btn-ghost btn-block" type="button" data-i18n="back">Back</button>
+        </div>
+
+        <p id="loginHint" class="hint-text hidden"></p>
+      </div>
+    </section>
+
+    <!-- ============ APP ============ -->
+    <section id="appSection" class="stack hidden">
+      <div class="tabs app-tabs" role="tablist">
+        <button class="tab active" data-utab="save" type="button" data-i18n="app.tab_save">Save</button>
+        <button class="tab" data-utab="history" type="button" data-i18n="app.tab_history">History</button>
+        <button id="adminTab" class="tab hidden" data-utab="admin" type="button" data-i18n="app.tab_admin">Admin</button>
+      </div>
+
+      <div id="savePanel" class="tab-panel stack">
+        <div class="card anim anim-1">
+          <div class="card-head row-between">
+            <div>
+              <h2 data-i18n="save.title">Save a message</h2>
+              <p class="muted small" data-i18n="save.desc">Paste a Telegram link and we'll send it straight to your Saved&nbsp;Messages.</p>
+            </div>
+            <span id="quota" class="pill" title="Remaining saves today">…</span>
+          </div>
+
+          <div class="fetch-row">
+            <div class="input-wrap grow">
+              <span class="input-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+              </span>
+              <input id="linkInput" type="text" spellcheck="false" autocomplete="off"
+                     placeholder="https://t.me/channel/123">
+            </div>
+            <button id="fetchBtn" class="btn btn-primary" type="button">
+              <span class="btn-label" data-i18n="save.btn">Save</span>
+              <svg class="btn-icon" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+            </button>
+          </div>
+
+          <div class="hint-row">
+            <span class="muted small" data-i18n-html="save.hint">Public links · private <code>t.me/c/…</code> · invite links · albums</span>
+          </div>
+
+          <div id="forceSubBanner" class="alert hidden"></div>
+          <div id="banBanner" class="alert alert-error hidden" data-i18n="ban.banner">Your account has been banned.</div>
+          <div id="saveOffBanner" class="alert hidden" data-i18n="err.saving_off">Saving is temporarily disabled by the administrator.</div>
+        </div>
+
+        <div id="jobCard" class="card anim anim-2 hidden">
+          <div class="job-head">
+            <div class="job-head-left">
+              <div class="job-titlerow">
+                <span id="jobStatus" class="badge" data-i18n="status.queued">queued</span>
+                <span id="jobPct" class="job-pct">0%</span>
+              </div>
+              <a id="jobLink" class="job-link" target="_blank" rel="noopener"></a>
+            </div>
+          </div>
+
+          <div class="progress"><div id="jobBar" class="progress-bar"></div></div>
+
+          <div class="job-meta">
+            <span id="jobStep" data-i18n="step.waiting">Waiting…</span>
+            <span id="jobStats" class="muted small"></span>
+          </div>
+
+          <div id="jobError" class="alert alert-error fade-in hidden"></div>
+
+          <div id="jobResult" class="result fade-in hidden">
+            <div class="result-main">
+              <span class="result-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M21.801 10A10 10 0 1 1 17 3.335"/><path d="m9 11 3 3L22 4"/></svg>
+              </span>
+              <div class="result-body">
+                <div id="jobMessage" class="result-msg"></div>
+                <ul id="jobItems" class="items"></ul>
+              </div>
+            </div>
+            <a id="jobOpen" class="btn btn-primary" href="#" target="_blank" rel="noopener">
+              <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 2 11 13"/><path d="M22 2 15 22 11 13 2 9 2 2z"/></svg>
+              <span data-i18n="open_tg">Open in Telegram</span>
+            </a>
+          </div>
+
+          <pre id="jobText" class="text-preview hidden"></pre>
+        </div>
+
+      </div>
+
+      <div id="historyPanel" class="tab-panel stack hidden">
+        <div class="card anim anim-3">
+          <div id="historySkeleton" class="sk-list" aria-hidden="true">
+            <div class="sk-row">
+              <div class="sk-col">
+                <span class="sk sk-grow"></span>
+                <span class="sk sk-grow sk-short"></span>
+              </div>
+              <span class="sk sk-pill"></span>
+            </div>
+            <div class="sk-row">
+              <div class="sk-col">
+                <span class="sk sk-grow"></span>
+                <span class="sk sk-grow sk-short"></span>
+              </div>
+              <span class="sk sk-pill"></span>
+            </div>
+            <div class="sk-row">
+              <div class="sk-col">
+                <span class="sk sk-grow"></span>
+                <span class="sk sk-grow sk-short"></span>
+              </div>
+              <span class="sk sk-pill"></span>
+            </div>
+            <div class="sk-row">
+              <div class="sk-col">
+                <span class="sk sk-grow"></span>
+                <span class="sk sk-grow sk-short"></span>
+              </div>
+              <span class="sk sk-pill"></span>
+            </div>
+          </div>
+          <ul id="jobList" class="job-list hidden"></ul>
+          <p id="emptyJobs" class="empty muted small hidden" data-i18n="empty.jobs">No saves yet. Files you save will appear here.</p>
+        </div>
+      </div>
+
+      <!-- ============ ADMIN ============ -->
+      <div id="adminPanel" class="tab-panel stack hidden">
+        <div class="card anim anim-1">
+          <div class="card-head row-between">
+            <div>
+              <h2 data-i18n="admin.overview">Overview</h2>
+              <p class="muted small" data-i18n="admin.desc">Live numbers from the bot and this website.</p>
+            </div>
+            <button id="adminRefreshBtn" class="btn btn-outline btn-sm" type="button" data-i18n="admin.refresh">Refresh</button>
+          </div>
+
+          <div id="adminSkeleton" class="stat-grid" aria-hidden="true">
+            <div class="sk sk-tile"></div>
+            <div class="sk sk-tile"></div>
+            <div class="sk sk-tile"></div>
+            <div class="sk sk-tile"></div>
+            <div class="sk sk-tile"></div>
+            <div class="sk sk-tile"></div>
+            <div class="sk sk-tile"></div>
+            <div class="sk sk-tile"></div>
+            <div class="sk sk-tile"></div>
+            <div class="sk sk-tile"></div>
+          </div>
+
+          <div id="adminBody" class="hidden">
+            <div class="stat-grid">
+              <div class="stat-tile"><span class="stat-value" id="statUsers">0</span><span class="stat-label" data-i18n="admin.stat_users">Total users</span></div>
+              <div class="stat-tile"><span class="stat-value" id="statLoggedIn">0</span><span class="stat-label" data-i18n="admin.stat_logged_in">Logged in</span></div>
+              <div class="stat-tile"><span class="stat-value" id="statVisited">0</span><span class="stat-label" data-i18n="admin.stat_visited">Visited the site</span></div>
+              <div class="stat-tile"><span class="stat-value" id="statReturning">0</span><span class="stat-label" data-i18n="admin.stat_returning">Returning users</span></div>
+              <div class="stat-tile"><span class="stat-value" id="statBanned">0</span><span class="stat-label" data-i18n="admin.stat_banned">Banned</span></div>
+              <div class="stat-tile"><span class="stat-value" id="statFiles">0</span><span class="stat-label" data-i18n="admin.stat_files">Files saved</span></div>
+              <div class="stat-tile"><span class="stat-value" id="statJobs">0</span><span class="stat-label" data-i18n="admin.stat_jobs">Total jobs</span></div>
+              <div class="stat-tile"><span class="stat-value" id="statSavesToday">0</span><span class="stat-label" data-i18n="admin.stat_saves_today">Files saved today</span></div>
+              <div class="stat-tile"><span class="stat-value" id="statVisitsToday">0</span><span class="stat-label" data-i18n="admin.stat_visits_today">Visits today</span></div>
+              <div class="stat-tile"><span class="stat-value" id="statActive">0</span><span class="stat-label" data-i18n="admin.stat_active">Active jobs now</span></div>
+            </div>
+
+            <div class="chart-card">
+              <div class="chart-title" data-i18n="admin.chart_files">Files saved per day (last 30 days)</div>
+              <div id="chartFiles" class="chart"></div>
+            </div>
+            <div class="chart-card">
+              <div class="chart-title" data-i18n="admin.chart_visits">Visits per day (last 30 days)</div>
+              <div id="chartVisits" class="chart"></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card anim anim-2">
+          <div class="card-head">
+            <h3 data-i18n="admin.settings">Dashboard settings</h3>
+          </div>
+          <div class="field">
+            <label for="noticeInput" data-i18n="admin.notice_label">Notice banner</label>
+            <textarea id="noticeInput" rows="2" maxlength="500"
+                      placeholder="Shown at the top of every page. Leave empty to hide it."
+                      data-i18n-placeholder="admin.notice_hint"></textarea>
+          </div>
+          <div class="opt-row">
+            <label class="switch-row">
+              <input type="checkbox" id="savingToggle" checked>
+              <span class="switch" aria-hidden="true"></span>
+              <span data-i18n="admin.saving_label">Allow saving</span>
+            </label>
+            <p class="field-hint" data-i18n="admin.saving_hint">Turn this off to disable the Save button for everyone.</p>
+          </div>
+          <div class="admin-actions">
+            <button id="settingsSaveBtn" class="btn btn-primary" type="button">
+              <span class="btn-label" data-i18n="admin.save_settings">Save settings</span>
+            </button>
+            <button id="changePinBtn" class="btn btn-outline" type="button" data-i18n="admin.change_pin">Change admin password</button>
+          </div>
+        </div>
+
+        <div class="card anim anim-3">
+          <div class="card-head row-between">
+            <div><h3 data-i18n="admin.users">Users</h3></div>
+            <span id="adminUserCount" class="pill hidden"></span>
+          </div>
+          <ul id="userList" class="user-list"></ul>
+          <p id="adminNoUsers" class="empty muted small hidden" data-i18n="admin.no_users">No users yet.</p>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- ============ LOGOUT CONFIRMATION ============ -->
+  <div id="logoutModal" class="modal-backdrop hidden" role="dialog" aria-modal="true"
+       data-i18n-aria="modal.logout_title" aria-label="Log out?">
+    <div class="modal">
+      <span class="modal-icon" aria-hidden="true">
+        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" x2="9" y1="12" y2="12"/></svg>
+      </span>
+      <h4 class="modal-title" data-i18n="modal.logout_title">Log out?</h4>
+      <p class="modal-desc" data-i18n="modal.logout_desc">You'll need to log in with your phone number again to start saving.</p>
+      <div class="modal-actions">
+        <button id="logoutCancel" class="btn btn-outline" type="button" data-i18n="modal.cancel">Cancel</button>
+        <button id="logoutConfirm" class="btn btn-danger" type="button" data-i18n="modal.confirm">Log out</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ ADMIN PASSWORD (forced on first login / manual change) ============ -->
+  <div id="pinModal" class="modal-backdrop hidden" role="dialog" aria-modal="true"
+       data-i18n-aria="pin.title" aria-label="Change your admin password">
+    <div class="modal">
+      <span class="modal-icon" aria-hidden="true">
+        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/></svg>
+      </span>
+      <h4 class="modal-title" id="pinTitle" data-i18n="pin.title">Change your admin password</h4>
+      <p class="modal-desc" id="pinDesc">You are signed in with the default password. Choose your own to continue.</p>
+
+      <div class="field" id="pinCurrentField">
+        <label for="pinCurrent" data-i18n="pin.current">Current password</label>
+        <input id="pinCurrent" type="password" inputmode="numeric" autocomplete="current-password" maxlength="12">
+      </div>
+      <div class="field">
+        <label for="pinNew" data-i18n="pin.new">New password</label>
+        <input id="pinNew" type="password" inputmode="numeric" autocomplete="new-password" maxlength="12">
+      </div>
+      <div class="field">
+        <label for="pinConfirm" data-i18n="pin.confirm">Confirm new password</label>
+        <input id="pinConfirm" type="password" inputmode="numeric" autocomplete="new-password" maxlength="12">
+      </div>
+      <p id="pinError" class="field-hint error hidden"></p>
+
+      <div class="modal-actions">
+        <button id="pinCancel" class="btn btn-outline" type="button" data-i18n="modal.cancel">Cancel</button>
+        <button id="pinSave" class="btn btn-primary" type="button">
+          <span class="btn-label" data-i18n="pin.save">Save password</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <div id="toast" class="toast hidden"></div>
+  <script src="/i18n.js?v=4"></script>
+  <script src="/app.js?v=4"></script>
+</body>
+</html>
