@@ -289,6 +289,9 @@ class Database:
             "admin_pin_hash": doc.get("admin_pin_hash") or self._hash_pin(ADMIN_PIN),
             "admin_pin_changed": bool(doc.get("admin_pin_changed")),
             "notice": doc.get("notice") or "",
+            "notice_login": doc.get("notice_login") or "",
+            "notice_color": doc.get("notice_color") or "blue",
+            "notice_login_color": doc.get("notice_login_color") or "blue",
             "saving_enabled": bool(doc.get("saving_enabled", True)),
         }
 

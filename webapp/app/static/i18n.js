@@ -204,7 +204,14 @@ const I18N = {
     "srv.saved_links": "Saved {1} links to your Saved Messages.",
     "srv.saved_links_partial": "Saved {1}/{2} links to your Saved Messages.",
     "step.finding_n": "Finding files {1}/{2}...",
-    "step.link_n": "Saving link {1}/{2}..."
+    "step.link_n": "Saving link {1}/{2}...",
+    "admin.notice_login_label": "Login page notice",
+    "admin.notice_login_hint": "Shown on the login page to visitors who are not signed in. Leave empty to hide it.",
+    "admin.color_label": "Color",
+    "admin.color_blue": "Blue",
+    "admin.color_red": "Red",
+    "admin.color_yellow": "Yellow",
+    "admin.color_green": "Green"
   },
 
   es: {
@@ -406,7 +413,14 @@ const I18N = {
     "srv.saved_links": "Se guardaron {1} enlaces en tus Mensajes guardados.",
     "srv.saved_links_partial": "Se guardaron {1}/{2} enlaces en tus Mensajes guardados.",
     "step.finding_n": "Buscando archivos {1}/{2}...",
-    "step.link_n": "Guardando enlace {1}/{2}..."
+    "step.link_n": "Guardando enlace {1}/{2}...",
+    "admin.notice_login_label": "Aviso en la página de inicio de sesión",
+    "admin.notice_login_hint": "Se muestra en la página de acceso a los visitantes que no han iniciado sesión. Déjalo vacío para ocultarlo.",
+    "admin.color_label": "Color",
+    "admin.color_blue": "Azul",
+    "admin.color_red": "Rojo",
+    "admin.color_yellow": "Amarillo",
+    "admin.color_green": "Verde"
   },
 
   fr: {
@@ -608,7 +622,14 @@ const I18N = {
     "srv.saved_links": "{1} liens enregistrés dans vos Messages enregistrés.",
     "srv.saved_links_partial": "{1}/{2} liens enregistrés dans vos Messages enregistrés.",
     "step.finding_n": "Recherche des fichiers {1}/{2}...",
-    "step.link_n": "Enregistrement du lien {1}/{2}..."
+    "step.link_n": "Enregistrement du lien {1}/{2}...",
+    "admin.notice_login_label": "Aviso sur la page de connexion",
+    "admin.notice_login_hint": "Affiché sur la page de connexion aux visiteurs non connectés. Laissez vide pour le masquer.",
+    "admin.color_label": "Couleur",
+    "admin.color_blue": "Bleu",
+    "admin.color_red": "Rouge",
+    "admin.color_yellow": "Jaune",
+    "admin.color_green": "Vert"
   },
 
   ar: {
@@ -810,7 +831,14 @@ const I18N = {
     "srv.saved_links": "تم حفظ {1} رابط في رسائلك المحفوظة.",
     "srv.saved_links_partial": "تم حفظ {1}/{2} رابط في رسائلك المحفوظة.",
     "step.finding_n": "جارٍ البحث عن الملفات {1}/{2}...",
-    "step.link_n": "جارٍ حفظ الرابط {1}/{2}..."
+    "step.link_n": "جارٍ حفظ الرابط {1}/{2}...",
+    "admin.notice_login_label": "إشعار صفحة تسجيل الدخول",
+    "admin.notice_login_hint": "يظهر في صفحة تسجيل الدخول للزوار غير المسجلين. اتركه فارغاً لإخفائه.",
+    "admin.color_label": "اللون",
+    "admin.color_blue": "أزرق",
+    "admin.color_red": "أحمر",
+    "admin.color_yellow": "أصفر",
+    "admin.color_green": "أخضر"
   },
 
   ru: {
@@ -1012,7 +1040,14 @@ const I18N = {
     "srv.saved_links": "Сохранено ссылок в Избранное: {1}",
     "srv.saved_links_partial": "Сохранено ссылок в Избранное: {1}/{2}",
     "step.finding_n": "Поиск файлов {1}/{2}...",
-    "step.link_n": "Сохранение ссылки {1}/{2}..."
+    "step.link_n": "Сохранение ссылки {1}/{2}...",
+    "admin.notice_login_label": "Объявление на странице входа",
+    "admin.notice_login_hint": "Показывается на странице входа посетителям без входа. Оставьте пустым, чтобы скрыть.",
+    "admin.color_label": "Цвет",
+    "admin.color_blue": "Синий",
+    "admin.color_red": "Красный",
+    "admin.color_yellow": "Жёлтый",
+    "admin.color_green": "Зелёный"
   },
 
   zh: {
@@ -1214,7 +1249,14 @@ const I18N = {
     "srv.saved_links": "已保存 {1} 个链接到收藏夹。",
     "srv.saved_links_partial": "已保存 {1}/{2} 个链接到收藏夹。",
     "step.finding_n": "正在查找文件 {1}/{2}...",
-    "step.link_n": "正在保存链接 {1}/{2}..."
+    "step.link_n": "正在保存链接 {1}/{2}...",
+    "admin.notice_login_label": "登录页公告",
+    "admin.notice_login_hint": "显示在登录页面上，供未登录的访客查看。留空则不显示。",
+    "admin.color_label": "颜色",
+    "admin.color_blue": "蓝色",
+    "admin.color_red": "红色",
+    "admin.color_yellow": "黄色",
+    "admin.color_green": "绿色"
   },
 
   pt: {
@@ -1416,7 +1458,14 @@ const I18N = {
     "srv.saved_links": "{1} links salvos nas suas Mensagens salvas.",
     "srv.saved_links_partial": "{1}/{2} links salvos nas suas Mensagens salvas.",
     "step.finding_n": "Procurando arquivos {1}/{2}...",
-    "step.link_n": "Salvando link {1}/{2}..."
+    "step.link_n": "Salvando link {1}/{2}...",
+    "admin.notice_login_label": "Aviso na página de login",
+    "admin.notice_login_hint": "Mostrado na página de login para visitantes que não entraram. Deixe vazio para ocultar.",
+    "admin.color_label": "Cor",
+    "admin.color_blue": "Azul",
+    "admin.color_red": "Vermelho",
+    "admin.color_yellow": "Amarelo",
+    "admin.color_green": "Verde"
   },
 
   id: {
@@ -1618,7 +1667,14 @@ const I18N = {
     "srv.saved_links": "{1} tautan disimpan ke Pesan Tersimpan Anda.",
     "srv.saved_links_partial": "{1}/{2} tautan disimpan ke Pesan Tersimpan Anda.",
     "step.finding_n": "Mencari file {1}/{2}...",
-    "step.link_n": "Menyimpan tautan {1}/{2}..."
+    "step.link_n": "Menyimpan tautan {1}/{2}...",
+    "admin.notice_login_label": "Pemberitahuan halaman masuk",
+    "admin.notice_login_hint": "Ditampilkan di halaman masuk untuk pengunjung yang belum masuk. Kosongkan untuk menyembunyikan.",
+    "admin.color_label": "Warna",
+    "admin.color_blue": "Biru",
+    "admin.color_red": "Merah",
+    "admin.color_yellow": "Kuning",
+    "admin.color_green": "Hijau"
   }
 };
 
@@ -1669,7 +1725,6 @@ const SERVER_EXACT = {
   "Wrong password. Please try again.": "err.pwd_wrong",
   "Enter your two-step verification password.": "err.pwd_empty",
   "Login session expired. Please start again.": "err.login_expired",
-  "Invalid phone number or admin password.": "err.admin_pin",
   "The password must be 6 to 12 digits.": "err.pin_digits",
   "The current password is incorrect.": "err.pin_current",
   "The new password must be different.": "err.pin_same",

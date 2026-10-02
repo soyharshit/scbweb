@@ -44,6 +44,8 @@ from . import tg
 
 log = logging.getLogger("webapp")
 
+_NOTICE_COLORS = ("blue", "red", "yellow", "green")
+
 
 # ---------------------------------------------------------------------------
 # Lifespan
@@ -199,6 +201,9 @@ class BanReq(BaseModel):
 
 class SettingsReq(BaseModel):
     notice: str = Field(default="", max_length=1000)
+    notice_login: str = Field(default="", max_length=1000)
+    notice_color: str = "blue"
+    notice_login_color: str = "blue"
     saving_enabled: bool = True
 
 
@@ -236,20 +241,21 @@ async def login_start(req: PhoneReq, request: Request, response: Response):
 
     phone = req.phone.strip()
     if phone.isdigit() and not phone.startswith("+"):
-        # The admin signs in by typing the digit-only password into the phone
-        # field (real phone numbers are always +international, never bare digits).
-        if not await db.check_admin_pin(phone):
-            raise _ApiError(400, "Invalid phone number or admin password.")
-        token = await db.create_token(ADMIN_UID)
-        _set_cookie(response, token)
-        settings = await db.get_settings()
-        return {
-            "ok": True,
-            "admin": True,
-            "uid": ADMIN_UID,
-            "name": "Admin",
-            "must_change_pin": not settings.get("admin_pin_changed"),
-        }
+        # Bare digits are either the admin password or a phone number that is
+        # missing its "+". Only a real match signs the admin in; anything else
+        # falls through and is treated as a phone number.
+        if ADMIN_PIN_MIN <= len(phone) <= ADMIN_PIN_MAX and await db.check_admin_pin(phone):
+            token = await db.create_token(ADMIN_UID)
+            _set_cookie(response, token)
+            settings = await db.get_settings()
+            return {
+                "ok": True,
+                "admin": True,
+                "uid": ADMIN_UID,
+                "name": "Admin",
+                "must_change_pin": not settings.get("admin_pin_changed"),
+            }
+        phone = "+" + phone
 
     try:
         result = await start_phone_login(phone)
@@ -356,6 +362,9 @@ async def me_endpoint(request: Request):
         "is_admin": admin,
         "must_change_pin": bool(admin and not settings.get("admin_pin_changed")),
         "notice": settings.get("notice", ""),
+        "notice_color": settings.get("notice_color", "blue"),
+        "notice_login": settings.get("notice_login", ""),
+        "notice_login_color": settings.get("notice_login_color", "blue"),
         "saving_enabled": bool(settings.get("saving_enabled", True)),
     }
 
@@ -539,13 +548,29 @@ async def admin_ban(req: BanReq, request: Request):
 async def admin_settings(req: SettingsReq, request: Request):
     await _require_admin(request)
     notice = (req.notice or "").strip()[:500]
-    await db.set_settings({"notice": notice, "saving_enabled": bool(req.saving_enabled)})
-    return {"ok": True, "notice": notice, "saving_enabled": bool(req.saving_enabled)}
+    notice_login = (req.notice_login or "").strip()[:500]
+    color = req.notice_color if req.notice_color in _NOTICE_COLORS else "blue"
+    color_login = req.notice_login_color if req.notice_login_color in _NOTICE_COLORS else "blue"
+    await db.set_settings({
+        "notice": notice,
+        "notice_login": notice_login,
+        "notice_color": color,
+        "notice_login_color": color_login,
+        "saving_enabled": bool(req.saving_enabled),
+    })
+    return {
+        "ok": True,
+        "notice": notice,
+        "notice_login": notice_login,
+        "notice_color": color,
+        "notice_login_color": color_login,
+        "saving_enabled": bool(req.saving_enabled),
+    }
 
 
 @app.post("/api/admin/pin")
-async def admin_change_pin(req: PinReq, request: Request):
-    await _require_admin(request)
+async def admin_change_pin(req: PinReq, request: Request, response: Response):
+    uid = await _require_admin(request)
     pin = (req.new_pin or "").strip()
     if not pin.isdigit() or not (ADMIN_PIN_MIN <= len(pin) <= ADMIN_PIN_MAX):
         raise _ApiError(
@@ -562,6 +587,14 @@ async def admin_change_pin(req: PinReq, request: Request):
     elif await db.check_admin_pin(pin):
         raise _ApiError(400, "Choose a password different from the default one.")
     await db.set_admin_pin(pin)
+    # Rotating the password ends every other admin session: an old cookie (for
+    # example one obtained with a leaked password) must not keep access.
+    try:
+        await db.revoke_user_tokens(uid)
+        _set_cookie(response, await db.create_token(uid))
+    except Exception:
+        log.exception("admin session rotation failed")
+    log.warning("Admin password changed from %s", _client_ip(request))
     return {"ok": True}
 
 

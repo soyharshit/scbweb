@@ -440,6 +440,9 @@ input.code-input:focus { background: var(--field); }
 }
 .alert a { color: inherit; font-weight: 600; }
 .alert-error { background: #fef2f2; border-color: #fecaca; color: #b91c1c; white-space: pre-wrap; }
+.alert-red { background: #fef2f2; border-color: #fecaca; color: #b91c1c; }
+.alert-yellow { background: #fefce8; border-color: #fde68a; color: #a16207; }
+.alert-green { background: #f0fdf4; border-color: #bbf7d0; color: #15803d; }
 
 /* ---------- badges ---------- */
 .badge {
@@ -806,6 +809,37 @@ input.code-input:focus { background: var(--field); }
 .opt-row .field-hint { text-align: start; }
 .admin-section { animation: fadeUp .25s var(--ease) both; }
 
+/* notice colour picker */
+.swatches { display: flex; align-items: center; gap: 8px; margin-top: 10px; }
+.swatches-label { font-size: .78rem; color: var(--muted-fg); margin-inline-end: 2px; }
+.swatch {
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  background: transparent;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  flex: none;
+  transition: transform .16s var(--ease), border-color .16s var(--ease);
+}
+.swatch span {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  display: block;
+  box-shadow: var(--shadow-sm);
+}
+.swatch[data-color="blue"] span { background: #3b82f6; }
+.swatch[data-color="red"] span { background: #ef4444; }
+.swatch[data-color="yellow"] span { background: #eab308; }
+.swatch[data-color="green"] span { background: #22c55e; }
+.swatch:hover { transform: scale(1.08); }
+.swatch.is-active { border-color: var(--foreground); }
+.swatch:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--ring); }
+
 /* toggle switch (settings) */
 .switch-row {
   display: inline-flex;
@@ -915,6 +949,21 @@ html[data-theme="dark"] .alert {
   background: rgba(96, 165, 250, .12);
   border-color: rgba(96, 165, 250, .32);
   color: #93c5fd;
+}
+html[data-theme="dark"] .alert-red {
+  background: rgba(248, 113, 113, .12);
+  border-color: rgba(248, 113, 113, .32);
+  color: #f87171;
+}
+html[data-theme="dark"] .alert-yellow {
+  background: rgba(250, 204, 21, .12);
+  border-color: rgba(250, 204, 21, .3);
+  color: #fde047;
+}
+html[data-theme="dark"] .alert-green {
+  background: rgba(74, 222, 128, .12);
+  border-color: rgba(74, 222, 128, .3);
+  color: #4ade80;
 }
 html[data-theme="dark"] .modal-icon { background: rgba(248, 113, 113, .14); }
 html[data-theme="dark"] .sk {

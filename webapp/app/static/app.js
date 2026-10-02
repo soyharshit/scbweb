@@ -123,6 +123,7 @@ function showLogin() {
   $("appSection").classList.add("hidden");
   $("userArea").classList.add("hidden");
   stopTicker();
+  renderLoginNotice();
 }
 
 async function showApp() {
@@ -197,12 +198,34 @@ function renderQuota() {
   $("fetchBtn").disabled = banned || off;
 
   // admin notice banner (visible on the login page and inside the app)
-  const notice = String(me.notice || "").trim();
-  const nb = $("noticeBanner");
-  nb.textContent = notice;
-  nb.classList.toggle("hidden", !notice);
+  paintNotice($("noticeBanner"), me.notice, me.notice_color);
 
   updateLinkHints();
+}
+
+// paint one notice banner with its colour
+function paintNotice(el, text, color) {
+  const msg = String(text || "").trim();
+  el.textContent = msg;
+  el.className = `alert${msg ? ` alert-${color || "blue"}` : ""}`;
+  el.classList.toggle("hidden", !msg);
+}
+
+// the login page shows its own notice, meant for visitors who are not signed in
+function renderLoginNotice() {
+  const me = state.me || {};
+  paintNotice($("noticeBanner"), me.notice_login, me.notice_login_color);
+}
+
+function setNoticeColor(target, color) {
+  document.querySelectorAll(`.swatch[data-target="${target}"]`).forEach((b) => {
+    b.classList.toggle("is-active", b.dataset.color === color);
+  });
+}
+
+function activeNoticeColor(target) {
+  const el = document.querySelector(`.swatch[data-target="${target}"].is-active`);
+  return el ? el.dataset.color : "blue";
 }
 
 // batch / multi hints under the link field
@@ -311,6 +334,9 @@ function wireEvents() {
   // admin panel
   document.querySelectorAll(".admin-subtabs .tab").forEach((tab) => {
     tab.addEventListener("click", () => activateAdminSub(tab.dataset.atab));
+  });
+  document.querySelectorAll(".swatch").forEach((btn) => {
+    btn.addEventListener("click", () => setNoticeColor(btn.dataset.target, btn.dataset.color));
   });
   $("adminRefreshBtn").addEventListener("click", refreshAdmin);
   $("settingsSaveBtn").addEventListener("click", saveAdminSettings);
@@ -567,6 +593,9 @@ function renderAdmin(data) {
 
   // settings form mirrors the state from /api/me
   $("noticeInput").value = (state.me && state.me.notice) || "";
+  $("noticeLoginInput").value = (state.me && state.me.notice_login) || "";
+  setNoticeColor("notice", (state.me && state.me.notice_color) || "blue");
+  setNoticeColor("notice-login", (state.me && state.me.notice_login_color) || "blue");
   $("savingToggle").checked = !state.me || state.me.saving_enabled !== false;
 
   renderUsers(data.users || []);
@@ -701,11 +730,17 @@ async function saveAdminSettings() {
       method: "POST",
       body: {
         notice: $("noticeInput").value.trim(),
+        notice_login: $("noticeLoginInput").value.trim(),
+        notice_color: activeNoticeColor("notice"),
+        notice_login_color: activeNoticeColor("notice-login"),
         saving_enabled: $("savingToggle").checked,
       },
     });
     if (state.me) {
       state.me.notice = r.notice;
+      state.me.notice_color = r.notice_color;
+      state.me.notice_login = r.notice_login;
+      state.me.notice_login_color = r.notice_login_color;
       state.me.saving_enabled = r.saving_enabled;
     }
     toast(t("admin.toast_settings"));

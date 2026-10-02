@@ -20,7 +20,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/style.css?v=6">
+  <link rel="stylesheet" href="/style.css?v=7">
 </head>
 <body>
   <header class="topbar">
@@ -349,6 +349,34 @@
             <textarea id="noticeInput" rows="2" maxlength="500"
                       placeholder="Shown at the top of every page. Leave empty to hide it."
                       data-i18n-placeholder="admin.notice_hint"></textarea>
+            <div class="swatches" role="group" data-for="notice">
+              <span class="swatches-label" data-i18n="admin.color_label">Color</span>
+              <button class="swatch is-active" type="button" data-color="blue" data-target="notice"
+                      data-i18n-title="admin.color_blue" data-i18n-aria="admin.color_blue"><span></span></button>
+              <button class="swatch" type="button" data-color="red" data-target="notice"
+                      data-i18n-title="admin.color_red" data-i18n-aria="admin.color_red"><span></span></button>
+              <button class="swatch" type="button" data-color="yellow" data-target="notice"
+                      data-i18n-title="admin.color_yellow" data-i18n-aria="admin.color_yellow"><span></span></button>
+              <button class="swatch" type="button" data-color="green" data-target="notice"
+                      data-i18n-title="admin.color_green" data-i18n-aria="admin.color_green"><span></span></button>
+            </div>
+          </div>
+          <div class="field">
+            <label for="noticeLoginInput" data-i18n="admin.notice_login_label">Login page notice</label>
+            <textarea id="noticeLoginInput" rows="2" maxlength="500"
+                      placeholder="Shown on the login page. Leave empty to hide it."
+                      data-i18n-placeholder="admin.notice_login_hint"></textarea>
+            <div class="swatches" role="group" data-for="notice-login">
+              <span class="swatches-label" data-i18n="admin.color_label">Color</span>
+              <button class="swatch is-active" type="button" data-color="blue" data-target="notice-login"
+                      data-i18n-title="admin.color_blue" data-i18n-aria="admin.color_blue"><span></span></button>
+              <button class="swatch" type="button" data-color="red" data-target="notice-login"
+                      data-i18n-title="admin.color_red" data-i18n-aria="admin.color_red"><span></span></button>
+              <button class="swatch" type="button" data-color="yellow" data-target="notice-login"
+                      data-i18n-title="admin.color_yellow" data-i18n-aria="admin.color_yellow"><span></span></button>
+              <button class="swatch" type="button" data-color="green" data-target="notice-login"
+                      data-i18n-title="admin.color_green" data-i18n-aria="admin.color_green"><span></span></button>
+            </div>
           </div>
           <div class="opt-row">
             <label class="switch-row">
@@ -432,7 +460,7 @@
   </div>
 
   <div id="toast" class="toast hidden"></div>
-  <script src="/i18n.js?v=6"></script>
-  <script src="/app.js?v=6"></script>
+  <script src="/i18n.js?v=7"></script>
+  <script src="/app.js?v=7"></script>
 </body>
 </html>
