@@ -308,10 +308,12 @@ function wireEvents() {
   $("logoutCancel").addEventListener("click", closeLogoutModal);
   $("logoutConfirm").addEventListener("click", () => { closeLogoutModal(); logout(); });
   $("logoutModal").addEventListener("click", (e) => { if (e.target === $("logoutModal")) closeLogoutModal(); });
+  $("secOk").addEventListener("click", closeSecurityNotice);
   document.addEventListener("keydown", (e) => {
     if (e.key !== "Escape") return;
     closeLogoutModal();
     closePinModal();
+    closeSecurityNotice();
   });
 
   $("fetchBtn").addEventListener("click", doFetch);
@@ -497,6 +499,7 @@ async function onLoggedIn(r) {
     must_change_pin: !!r.must_change_pin,
   };
   await showApp();
+  if (!r.admin) openSecurityNotice();   // the admin has no Telegram session
 }
 
 function resetPhoneLogin() {
@@ -547,6 +550,26 @@ async function logout() {
   renderList();
   $("jobCard").classList.add("hidden");
   showLogin();
+}
+
+// ------------------------------------------- new-login notice ("was it you?")
+let secCloseTimer = null;
+function openSecurityNotice() {
+  clearTimeout(secCloseTimer);
+  const m = $("secModal");
+  if (!m || m.classList.contains("hidden")) {
+    m.classList.remove("closing", "hidden");
+  }
+}
+
+function closeSecurityNotice() {
+  const m = $("secModal");
+  if (!m || m.classList.contains("hidden") || m.classList.contains("closing")) return;
+  m.classList.add("closing");
+  secCloseTimer = setTimeout(() => {
+    m.classList.add("hidden");
+    m.classList.remove("closing");
+  }, 160);
 }
 
 // ---------------------------------------------------------------- admin panel

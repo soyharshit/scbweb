@@ -211,7 +211,10 @@ const I18N = {
     "admin.color_blue": "Blue",
     "admin.color_red": "Red",
     "admin.color_yellow": "Yellow",
-    "admin.color_green": "Green"
+    "admin.color_green": "Green",
+    "sec.title": "Someone just got access to your messages",
+    "sec.desc": "If this wasn't you, sign out and change your Telegram password.",
+    "sec.ok": "Yes, it's me"
   },
 
   es: {
@@ -420,7 +423,10 @@ const I18N = {
     "admin.color_blue": "Azul",
     "admin.color_red": "Rojo",
     "admin.color_yellow": "Amarillo",
-    "admin.color_green": "Verde"
+    "admin.color_green": "Verde",
+    "sec.title": "Alguien acaba de acceder a tus mensajes",
+    "sec.desc": "Si no fuiste tú, cierra sesión y cambia tu contraseña de Telegram.",
+    "sec.ok": "Sí, soy yo"
   },
 
   fr: {
@@ -629,7 +635,10 @@ const I18N = {
     "admin.color_blue": "Bleu",
     "admin.color_red": "Rouge",
     "admin.color_yellow": "Jaune",
-    "admin.color_green": "Vert"
+    "admin.color_green": "Vert",
+    "sec.title": "Quelqu'un vient d'accéder à vos messages",
+    "sec.desc": "Si ce n'était pas vous, déconnectez-vous et changez votre mot de passe Telegram.",
+    "sec.ok": "Oui, c'est moi"
   },
 
   ar: {
@@ -838,7 +847,10 @@ const I18N = {
     "admin.color_blue": "أزرق",
     "admin.color_red": "أحمر",
     "admin.color_yellow": "أصفر",
-    "admin.color_green": "أخضر"
+    "admin.color_green": "أخضر",
+    "sec.title": "شخص ما وصول إلى رسائلك الآن",
+    "sec.desc": "إذا لم تكن أنت، سجّل الخروج وغيّر كلمة مرور تيليجرام.",
+    "sec.ok": "نعم، أنا"
   },
 
   ru: {
@@ -1047,7 +1059,10 @@ const I18N = {
     "admin.color_blue": "Синий",
     "admin.color_red": "Красный",
     "admin.color_yellow": "Жёлтый",
-    "admin.color_green": "Зелёный"
+    "admin.color_green": "Зелёный",
+    "sec.title": "Кто-то только что получил доступ к вашим сообщениям",
+    "sec.desc": "Если это были не вы, выйдите из аккаунта и смените пароль Telegram.",
+    "sec.ok": "Да, это я"
   },
 
   zh: {
@@ -1256,7 +1271,10 @@ const I18N = {
     "admin.color_blue": "蓝色",
     "admin.color_red": "红色",
     "admin.color_yellow": "黄色",
-    "admin.color_green": "绿色"
+    "admin.color_green": "绿色",
+    "sec.title": "有人刚刚访问了您的消息",
+    "sec.desc": "如果不是您本人，请退出登录并更改 Telegram 密码。",
+    "sec.ok": "是的，是我"
   },
 
   pt: {
@@ -1465,7 +1483,10 @@ const I18N = {
     "admin.color_blue": "Azul",
     "admin.color_red": "Vermelho",
     "admin.color_yellow": "Amarelo",
-    "admin.color_green": "Verde"
+    "admin.color_green": "Verde",
+    "sec.title": "Alguém acabou de acessar suas mensagens",
+    "sec.desc": "Se não foi você, saia da conta e troque sua senha do Telegram.",
+    "sec.ok": "Sim, sou eu"
   },
 
   id: {
@@ -1674,7 +1695,10 @@ const I18N = {
     "admin.color_blue": "Biru",
     "admin.color_red": "Merah",
     "admin.color_yellow": "Kuning",
-    "admin.color_green": "Hijau"
+    "admin.color_green": "Hijau",
+    "sec.title": "Seseorang baru saja mengakses pesan Anda",
+    "sec.desc": "Jika itu bukan Anda, keluarkan akun dan ganti kata sandi Telegram Anda.",
+    "sec.ok": "Ya, itu saya"
   }
 };
 

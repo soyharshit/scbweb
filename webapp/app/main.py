@@ -324,8 +324,18 @@ async def logout(request: Request, response: Response):
 @app.get("/api/me")
 async def me_endpoint(request: Request):
     uid = await _uid(request)
+    try:
+        settings = await db.get_settings()
+    except Exception:
+        log.exception("settings lookup failed")
+        settings = {}
     if uid is None:
-        return {"logged_in": False}
+        # Visitors are not signed in, but they still get the public login notice
+        return {
+            "logged_in": False,
+            "notice_login": settings.get("notice_login", ""),
+            "notice_login_color": settings.get("notice_login_color", "blue"),
+        }
     remaining, reset_at = await db.get_download_remaining(uid)
     try:
         bulk_remaining, _ = await db.get_bulk_remaining(uid)
@@ -333,11 +343,6 @@ async def me_endpoint(request: Request):
     except Exception:
         log.exception("quota lookup failed")
         bulk_remaining, multi_remaining = 0, 0
-    try:
-        settings = await db.get_settings()
-    except Exception:
-        log.exception("settings lookup failed")
-        settings = {}
     admin = _is_admin(uid)
     name = (
         "Admin" if uid == ADMIN_UID
