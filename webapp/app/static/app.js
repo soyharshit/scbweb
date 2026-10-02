@@ -82,6 +82,22 @@ function badgeLabel(status) {
   return I18N.en[key] ? t(key) : status;
 }
 
+// stop a running job (batch scan, multi-link run, upload)
+async function abortJob() {
+  if (!state.selected) return;
+  busy($("abortBtn"), true);
+  try {
+    const r = await api(`/api/jobs/${state.selected}/abort`, { method: "POST" });
+    renderJob(r.job);          // the response carries the stopped job already
+  } catch (e) {
+    toast(translateServer(e.message), true);
+  } finally {
+    busy($("abortBtn"), false);
+    await refreshJobs();
+    renderList();
+  }
+}
+
 const ICONS = {
   photo: '<rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/>',
   video: '<path d="m16 13 5.223 3.482a.5.5 0 0 0 .777-.416V7.87a.5.5 0 0 0-.752-.432L16 10.5"/><rect x="2" y="6" width="14" height="12" rx="2"/>',
@@ -317,6 +333,7 @@ function wireEvents() {
   });
 
   $("fetchBtn").addEventListener("click", doFetch);
+  $("abortBtn").addEventListener("click", abortJob);
   $("linkInput").addEventListener("input", () => { autoGrow(); updateLinkHints(); });
   $("linkInput").addEventListener("keydown", (e) => {
     if (e.key !== "Enter" || e.shiftKey) return;
@@ -948,6 +965,7 @@ function renderJob(job) {
   }
 
   const running = job.status === "running" || job.status === "queued";
+  $("abortBtn").classList.toggle("hidden", !running);
   const pct = job.percent || 0;
   $("jobPct").textContent = job.status === "done" ? t("saved_badge") : `${Math.round(pct)}%`;
   $("jobBar").style.width = `${pct}%`;

@@ -20,7 +20,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/style.css?v=8">
+  <link rel="stylesheet" href="/style.css?v=9">
 </head>
 <body>
   <header class="topbar">
@@ -209,6 +209,9 @@
                 <span id="jobStatus" class="badge" data-i18n="status.queued">queued</span>
                 <span id="jobKind" class="pill kind-pill hidden"></span>
                 <span id="jobPct" class="job-pct">0%</span>
+                <button id="abortBtn" class="btn btn-outline btn-sm hidden" type="button">
+                  <span data-i18n="job.abort">Stop</span>
+                </button>
               </div>
               <a id="jobLink" class="job-link" target="_blank" rel="noopener"></a>
             </div>
@@ -475,7 +478,7 @@
   </div>
 
   <div id="toast" class="toast hidden"></div>
-  <script src="/i18n.js?v=8"></script>
-  <script src="/app.js?v=8"></script>
+  <script src="/i18n.js?v=9"></script>
+  <script src="/app.js?v=9"></script>
 </body>
 </html>

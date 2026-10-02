@@ -214,7 +214,13 @@ const I18N = {
     "admin.color_green": "Green",
     "sec.title": "New login to your account",
     "sec.desc": "This is what Telegram shows after every login. Open the Telegram app and check Active sessions to confirm it was you.",
-    "sec.ok": "Yes, it's me"
+    "sec.ok": "Yes, it's me",
+    "status.aborted": "stopped",
+    "job.abort": "Stop",
+    "step.stopped": "Stopped",
+    "step.resuming": "Resuming...",
+    "step.flood_wait": "Rate limited by Telegram, waiting {1}s",
+    "err.job_finished": "This job has already finished."
   },
 
   es: {
@@ -426,7 +432,13 @@ const I18N = {
     "admin.color_green": "Verde",
     "sec.title": "Nuevo inicio de sesión en tu cuenta",
     "sec.desc": "Esto es lo que Telegram muestra tras cada inicio de sesión. Abre la app de Telegram y revisa Sesiones activas para confirmar que fuiste tú.",
-    "sec.ok": "Sí, soy yo"
+    "sec.ok": "Sí, soy yo",
+    "status.aborted": "detenido",
+    "job.abort": "Detener",
+    "step.stopped": "Detenido",
+    "step.resuming": "Reanudando...",
+    "step.flood_wait": "Limitado por Telegram, esperando {1} s",
+    "err.job_finished": "Este trabajo ya ha terminado."
   },
 
   fr: {
@@ -638,7 +650,13 @@ const I18N = {
     "admin.color_green": "Vert",
     "sec.title": "Nouvelle connexion à votre compte",
     "sec.desc": "C'est ce que Telegram affiche après chaque connexion. Ouvrez l'application Telegram et vérifiez les Sessions actives pour confirmer que c'était vous.",
-    "sec.ok": "Oui, c'est moi"
+    "sec.ok": "Oui, c'est moi",
+    "status.aborted": "arrêté",
+    "job.abort": "Arrêter",
+    "step.stopped": "Arrêté",
+    "step.resuming": "Reprise...",
+    "step.flood_wait": "Limité par Telegram, attente de {1} s",
+    "err.job_finished": "Cette tâche est déjà terminée."
   },
 
   ar: {
@@ -850,7 +868,13 @@ const I18N = {
     "admin.color_green": "أخضر",
     "sec.title": "تسجيل دخول جديد إلى حسابك",
     "sec.desc": "هذا ما يعرضه تيليجرام بعد كل تسجيل دخول. افتح تطبيق تيليجرام وتحقق من الجلسات النشطة للتأكد أن الأمر منك.",
-    "sec.ok": "نعم، أنا"
+    "sec.ok": "نعم، أنا",
+    "status.aborted": "متوقف",
+    "job.abort": "إيقاف",
+    "step.stopped": "متوقف",
+    "step.resuming": "جارٍ الاستئناف...",
+    "step.flood_wait": "تم تحديدك من تيليجرام، انتظار {1} ث",
+    "err.job_finished": "هذه المهمة قد انتهت بالفعل."
   },
 
   ru: {
@@ -1062,7 +1086,13 @@ const I18N = {
     "admin.color_green": "Зелёный",
     "sec.title": "Новый вход в ваш аккаунт",
     "sec.desc": "Так Telegram показывает это при каждом входе. Откройте приложение Telegram и проверьте активные сеансы, чтобы убедиться, что это были вы.",
-    "sec.ok": "Да, это я"
+    "sec.ok": "Да, это я",
+    "status.aborted": "остановлено",
+    "job.abort": "Остановить",
+    "step.stopped": "Остановлено",
+    "step.resuming": "Продолжаем...",
+    "step.flood_wait": "Ограничение Telegram, ожидание {1} с",
+    "err.job_finished": "Эта задача уже завершена."
   },
 
   zh: {
@@ -1274,7 +1304,13 @@ const I18N = {
     "admin.color_green": "绿色",
     "sec.title": "账号有新登录",
     "sec.desc": "每次登录时 Telegram 都会显示此提示。请打开 Telegram 应用，在活动会话中确认这次登录是你本人。",
-    "sec.ok": "是的，是我"
+    "sec.ok": "是的，是我",
+    "status.aborted": "已停止",
+    "job.abort": "停止",
+    "step.stopped": "已停止",
+    "step.resuming": "继续处理...",
+    "step.flood_wait": "被 Telegram 限流，等待 {1} 秒",
+    "err.job_finished": "该任务已完成。"
   },
 
   pt: {
@@ -1486,7 +1522,13 @@ const I18N = {
     "admin.color_green": "Verde",
     "sec.title": "Novo login na sua conta",
     "sec.desc": "É isso que o Telegram mostra após cada login. Abra o app do Telegram e confira Sessões ativas para confirmar que foi você.",
-    "sec.ok": "Sim, sou eu"
+    "sec.ok": "Sim, sou eu",
+    "status.aborted": "parado",
+    "job.abort": "Parar",
+    "step.stopped": "Parado",
+    "step.resuming": "Retomando...",
+    "step.flood_wait": "Limitado pelo Telegram, aguardando {1}s",
+    "err.job_finished": "Este trabalho já foi concluído."
   },
 
   id: {
@@ -1698,7 +1740,13 @@ const I18N = {
     "admin.color_green": "Hijau",
     "sec.title": "Login baru ke akun Anda",
     "sec.desc": "Inilah yang ditampilkan Telegram setiap kali login. Buka aplikasi Telegram dan cek Sesi aktif untuk memastikan itu Anda.",
-    "sec.ok": "Ya, itu saya"
+    "sec.ok": "Ya, itu saya",
+    "status.aborted": "dihentikan",
+    "job.abort": "Hentikan",
+    "step.stopped": "Dihentikan",
+    "step.resuming": "Melanjutkan...",
+    "step.flood_wait": "Dibatasi Telegram, menunggu {1} d",
+    "err.job_finished": "Pekerjaan ini sudah selesai."
   }
 };
 
@@ -1762,7 +1810,10 @@ const SERVER_EXACT = {
   "Multi-link saves need message links (https://t.me/...).": "err.multi_link",
   "Enter how many files to save.": "err.batch_count",
   "No savable files were found after this link.": "err.batch_none",
-  "Unknown save mode.": "err.mode"
+  "Unknown save mode.": "err.mode",
+  "This job has already finished.": "err.job_finished",
+  "Stopped": "step.stopped",
+  "Resuming...": "step.resuming"
 };
 
 const SERVER_PATTERNS = [
@@ -1788,7 +1839,8 @@ const SERVER_PATTERNS = [
   [/^You can save up to (\d+) links at once\.$/, "err.multi_max"],
   [/^Line (\d+) is not a valid Telegram link\.$/, "err.line"],
   [/^Finding files (\d+)\/(\d+)\.\.\.$/, "step.finding_n"],
-  [/^Saving link (\d+)\/(\d+)\.\.\.$/, "step.link_n"]
+  [/^Saving link (\d+)\/(\d+)\.\.\.$/, "step.link_n"],
+  [/^Rate limited by Telegram, waiting (\d+)s$/, "step.flood_wait"]
 ];
 
 /* -------------------------------------------------------------------------

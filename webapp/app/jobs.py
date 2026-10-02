@@ -59,6 +59,7 @@ class Job:
     speed: int = 0
     error: str | None = None
     message: str | None = None
+    wait_left: int = 0        # seconds left of a Telegram rate-limit wait
     text: str | None = None
     items: list[dict] = field(default_factory=list)
     saved_ids: list[int] = field(default_factory=list)
@@ -91,6 +92,7 @@ def snapshot(job: Job) -> dict:
         "downloaded": job.downloaded,
         "total": job.total,
         "speed": job.speed,
+        "wait_left": job.wait_left,
         "error": job.error,
         "message": job.message,
         "text": job.text,
@@ -194,6 +196,16 @@ async def run_job(job: Job) -> None:
     except FloodWait as fw:
         job.status = "error"
         job.error = f"Rate limited by Telegram. Try again in {fw.value} seconds."
+    except asyncio.CancelledError:
+        # the user pressed Stop: keep whatever was saved so far, drop the rest
+        job.status = "aborted"
+        job.step = "Stopped"
+        job.error = None
+        try:
+            await _persist(job)
+        except Exception:
+            log.warning("could not persist aborted job %s", job.id)
+        raise
     except Exception as exc:  # noqa: BLE001
         log.exception("Job %s failed", job.id)
         job.status = "error"
@@ -203,6 +215,58 @@ async def run_job(job: Job) -> None:
         job.percent = 100.0 if job.status == "done" else job.percent
         job.touch()
         await _persist(job)   # final state for the durable history log
+
+
+def abort_job(job: Job) -> None:
+    """Stop a queued or running job (batch scans, multi-link runs, uploads)."""
+    if job.status not in ("queued", "running"):
+        raise JobError("This job has already finished.")
+    job.status = "aborted"
+    job.step = "Stopped"
+    job.touch()
+    if job.task and not job.task.done():
+        job.task.cancel()
+
+
+# ---------------------------------------------------------------------------
+# Rate limits: Telegram asks us to wait, so we wait and show the countdown
+# ---------------------------------------------------------------------------
+MAX_FLOOD_WAIT = 300      # never hold one call longer than this ...
+MAX_FLOOD_TOTAL = 900     # ... and never hold a whole job longer than this
+
+
+async def _flood_sleep(job: Job, seconds: float) -> None:
+    """Sleep through a FloodWait while the UI shows the time left."""
+    left = max(1, int(seconds))
+    while left > 0:
+        job.step = f"Rate limited by Telegram, waiting {left}s"
+        job.wait_left = left
+        job.touch()
+        await asyncio.sleep(1)
+        left -= 1
+    job.wait_left = 0
+    job.step = "Resuming..."
+    job.touch()
+
+
+async def _call(job: Job, what: str, fn):
+    """Run one Telegram API call, waiting out FloodWait errors.
+
+    A FloodWait is not a failure: Telegram says exactly how long to hold
+    off, so the job waits, shows a live countdown and retries. An absurd
+    wait is reported to the user instead of blocking for an hour.
+    """
+    spent = 0
+    while True:
+        try:
+            return await fn()
+        except FloodWait as fw:
+            delay = int(fw.value or 1)
+            if delay > MAX_FLOOD_WAIT or spent + delay > MAX_FLOOD_TOTAL:
+                raise
+            spent += delay
+            log.warning("FloodWait of %ss during %s, waiting", delay, what)
+            await _flood_sleep(job, delay)
 
 
 # ---------------------------------------------------------------------------
@@ -344,7 +408,8 @@ async def _resolve_message(userbot, job: Job, parsed: dict, require_content: boo
     msg = None
     for cid in chat_ids:
         try:
-            candidate = await userbot.get_messages(cid, msg_id)
+            candidate = await _call(job, "get_messages",
+                                   lambda cid=cid: userbot.get_messages(cid, msg_id))
             if _has_content(candidate):
                 msg = candidate
                 break
@@ -371,7 +436,8 @@ async def _resolve_message(userbot, job: Job, parsed: dict, require_content: boo
             known = await _cached_dialogs(userbot, job.uid)
             for cid in known:
                 if raw_id in str(abs(cid)):
-                    candidate = await userbot.get_messages(cid, msg_id)
+                    candidate = await _call(job, "get_messages",
+                                           lambda cid=cid: userbot.get_messages(cid, msg_id))
                     if _has_content(candidate):
                         msg = candidate
                         break
@@ -551,11 +617,14 @@ async def _download_to_temp(userbot, job: Job, msg, index: int, count: int, job_
     target = job_dir / f"{index:02d}_{_safe_name(_media_name(msg, index))}"
 
     start = time.time()
-    out = await userbot.download_media(
-        msg,
-        file_name=str(target),
-        progress=_download_progress(index, count, start),
-        progress_args=(job,),
+    out = await _call(
+        job, "download_media",
+        lambda: userbot.download_media(
+            msg,
+            file_name=str(target),
+            progress=_download_progress(index, count, start),
+            progress_args=(job,),
+        ),
     )
     if not out:
         raise JobError("Failed to download the media for re-upload.")
@@ -587,12 +656,14 @@ async def _store_to_saved(userbot, job: Job, msgs: list) -> tuple[list[int], str
 
         sid = None
         try:  # cheapest: a plain forward keeps the original formatting
-            sid = _sent_id(await userbot.forward_messages("me", m.chat.id, [m.id]))
+            sid = _sent_id(await _call(job, "forward",
+                                       lambda: userbot.forward_messages("me", m.chat.id, [m.id])))
         except Exception:
             sid = None
         if sid is None:
             try:  # copy behaves the same but leaves no "forwarded from" header
-                sid = _sent_id(await userbot.copy_message("me", m.chat.id, m.id))
+                sid = _sent_id(await _call(job, "copy",
+                                           lambda: userbot.copy_message("me", m.chat.id, m.id)))
             except Exception:
                 sid = None
         if sid is None:
@@ -603,6 +674,8 @@ async def _store_to_saved(userbot, job: Job, msgs: list) -> tuple[list[int], str
             saved.append(sid)
         else:
             failed += 1
+            log.warning("Message %s could not be saved at all (chat=%s)", m.id,
+                        getattr(getattr(m, "chat", None), "id", None))
 
     note = None
     if failed:
@@ -623,10 +696,14 @@ async def _fallback_save(userbot, job: Job, m, index: int, count: int, job_dir):
         if m.poll:
             try:
                 poll = m.poll
-                sent = await userbot.send_poll(
-                    "me",
-                    question=getattr(poll, "question", "") or "Poll",
-                    options=[getattr(o, "text", "") for o in (getattr(poll, "options", None) or [])],
+                sent = await _call(
+                    job, "send_poll",
+                    lambda: userbot.send_poll(
+                        "me",
+                        question=getattr(poll, "question", "") or "Poll",
+                        options=[getattr(o, "text", "") for o in
+                                 (getattr(poll, "options", None) or [])],
+                    ),
                 )
                 return _sent_id(sent), False
             except Exception:
@@ -634,7 +711,8 @@ async def _fallback_save(userbot, job: Job, m, index: int, count: int, job_dir):
         text = _text_content(m)
         if text:
             try:
-                return _sent_id(await userbot.send_message("me", text)), False
+                return _sent_id(await _call(job, "send_message",
+                                            lambda: userbot.send_message("me", text))), False
             except Exception:
                 pass
         return None, False
@@ -647,26 +725,27 @@ async def _fallback_save(userbot, job: Job, m, index: int, count: int, job_dir):
         caption = m.caption or None
 
         if m.photo:
-            sent = await userbot.send_photo("me", path, caption=caption,
-                                            progress=progress, progress_args=(job,))
+            send = lambda: userbot.send_photo("me", path, caption=caption,
+                                              progress=progress, progress_args=(job,))
         elif m.video:
-            sent = await userbot.send_video("me", path, caption=caption,
-                                            progress=progress, progress_args=(job,))
+            send = lambda: userbot.send_video("me", path, caption=caption,
+                                              progress=progress, progress_args=(job,))
         elif m.animation:
-            sent = await userbot.send_animation("me", path, caption=caption,
-                                                progress=progress, progress_args=(job,))
+            send = lambda: userbot.send_animation("me", path, caption=caption,
+                                                  progress=progress, progress_args=(job,))
         elif m.audio:
-            sent = await userbot.send_audio("me", path, caption=caption,
-                                            progress=progress, progress_args=(job,))
+            send = lambda: userbot.send_audio("me", path, caption=caption,
+                                              progress=progress, progress_args=(job,))
         elif m.voice:
-            sent = await userbot.send_voice("me", path,
-                                            progress=progress, progress_args=(job,))
+            send = lambda: userbot.send_voice("me", path,
+                                              progress=progress, progress_args=(job,))
         elif m.video_note:
-            sent = await userbot.send_video_note("me", path,
-                                                 progress=progress, progress_args=(job,))
+            send = lambda: userbot.send_video_note("me", path,
+                                                   progress=progress, progress_args=(job,))
         else:
-            sent = await userbot.send_document("me", path, caption=caption,
-                                               progress=progress, progress_args=(job,))
+            send = lambda: userbot.send_document("me", path, caption=caption,
+                                                 progress=progress, progress_args=(job,))
+        sent = await _call(job, "upload", send)
         return _sent_id(sent), False
     except Exception as exc:
         err = str(exc)
@@ -746,9 +825,11 @@ async def _save_msg(userbot, job: Job, msg, parsed: dict):
     msgs = [msg]
     if msg.media_group_id and not parsed.get("single"):
         try:
-            group = await userbot.get_media_group(msg.chat.id, msg.id)
+            group = await _call(job, "get_media_group",
+                                lambda: userbot.get_media_group(msg.chat.id, msg.id))
             msgs = sorted(group, key=lambda m: m.id)
         except Exception:
+            log.warning("Album around message %s could not be read", msg.id, exc_info=True)
             msgs = [msg]
     saved_ids, items, note = await _save_list(userbot, job, msgs)
     return saved_ids, items, note, msgs
@@ -821,10 +902,11 @@ async def _collect_batch(userbot, job: Job, base) -> list:
     if base.media_group_id:
         seen_groups.add(base.media_group_id)
         try:
-            for g in await userbot.get_media_group(base.chat.id, base.id):
+            for g in await _call(job, "get_media_group",
+                                lambda: userbot.get_media_group(base.chat.id, base.id)):
                 _add(g)
         except Exception:
-            pass
+            log.warning("Album around message %s could not be read", base.id, exc_info=True)
 
     cap = min(target * 10, 500)
     scanned = 0
@@ -834,7 +916,8 @@ async def _collect_batch(userbot, job: Job, base) -> list:
         scanned += 1
         next_id += 1
         try:
-            m = await userbot.get_messages(base.chat.id, next_id)
+            m = await _call(job, "get_messages",
+                            lambda: userbot.get_messages(base.chat.id, next_id))
         except Exception:
             m = None
         if m is None or getattr(m, "empty", False) or not _has_content(m):
@@ -850,7 +933,8 @@ async def _collect_batch(userbot, job: Job, base) -> list:
             seen_groups.add(gid)
             added = False
             try:
-                group = await userbot.get_media_group(m.chat.id, m.id)
+                group = await _call(job, "get_media_group",
+                                    lambda: userbot.get_media_group(m.chat.id, m.id))
                 for g in sorted(group, key=lambda x: x.id):
                     if _downloadable(g):
                         _add(g)

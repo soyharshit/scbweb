@@ -468,6 +468,7 @@ input.code-input:focus { background: var(--field); }
   animation: pulseSoft 1.6s ease-in-out infinite;
 }
 .badge.done { background: #f0fdf4; border-color: #bbf7d0; color: #15803d; }
+.badge.aborted { background: var(--muted); color: var(--muted-fg); }
 .badge.error { background: #fef2f2; border-color: #fecaca; color: #b91c1c; }
 
 /* ---------- job card ---------- */

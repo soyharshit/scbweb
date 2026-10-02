@@ -473,6 +473,7 @@ def _with_defaults(d: dict) -> dict:
     d.setdefault("downloaded", 0)
     d.setdefault("total", 0)
     d.setdefault("speed", 0)
+    d.setdefault("wait_left", 0)
     d.setdefault("kind", "single")
     d.setdefault("count", 0)
     d.setdefault("saved_ids", [])
@@ -505,6 +506,20 @@ async def job_detail(job_id: str, request: Request):
     if not job:
         raise _ApiError(404, "This job has expired or does not exist.")
     return {"job": jobs_mod.snapshot(job)}
+
+
+@app.post("/api/jobs/{job_id}/abort")
+async def job_abort(job_id: str, request: Request):
+    """Stop a running job (batch scan, multi-link run, upload)."""
+    uid = await _require_uid(request)
+    job = jobs_mod.get_job(job_id, uid)
+    if not job:
+        raise _ApiError(404, "This job has expired or does not exist.")
+    try:
+        jobs_mod.abort_job(job)
+    except jobs_mod.JobError as exc:
+        raise _ApiError(409, str(exc))
+    return {"ok": True, "job": jobs_mod.snapshot(job)}
 
 
 # ---------------------------------------------------------------------------
