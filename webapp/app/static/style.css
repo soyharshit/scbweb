@@ -804,6 +804,7 @@ input.code-input:focus { background: var(--field); }
 .admin-actions .btn { margin-top: 0; }
 .opt-row { display: flex; flex-direction: column; gap: 8px; margin-top: 16px; }
 .opt-row .field-hint { text-align: start; }
+.admin-section { animation: fadeUp .25s var(--ease) both; }
 
 /* toggle switch (settings) */
 .switch-row {

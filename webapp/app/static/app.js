@@ -129,7 +129,8 @@ async function showApp() {
   $("loginSection").classList.add("hidden");
   $("appSection").classList.remove("hidden");
   $("userArea").classList.remove("hidden");
-  activateAppTab("save");
+  renderAdminTab();
+  activateAppTab(state.me && state.me.is_admin ? "admin" : "save");
   // history keeps a skeleton visible until the first /api/jobs response lands
   $("historySkeleton").classList.remove("hidden");
   $("jobList").classList.add("hidden");
@@ -308,6 +309,9 @@ function wireEvents() {
   });
 
   // admin panel
+  document.querySelectorAll(".admin-subtabs .tab").forEach((tab) => {
+    tab.addEventListener("click", () => activateAdminSub(tab.dataset.atab));
+  });
   $("adminRefreshBtn").addEventListener("click", refreshAdmin);
   $("settingsSaveBtn").addEventListener("click", saveAdminSettings);
   $("changePinBtn").addEventListener("click", () => openPinModal(false));
@@ -328,7 +332,20 @@ function activateAppTab(name) {
   $("savePanel").classList.toggle("hidden", name !== "save");
   $("historyPanel").classList.toggle("hidden", name !== "history");
   $("adminPanel").classList.toggle("hidden", name !== "admin");
-  if (name === "admin") refreshAdmin();
+  if (name === "admin") {
+    activateAdminSub("overview");
+    refreshAdmin();
+  }
+}
+
+// admin panel sub-navigation: Overview / Dashboard settings / Users
+function activateAdminSub(name) {
+  document.querySelectorAll(".admin-subtabs .tab").forEach((t) => {
+    t.classList.toggle("active", t.dataset.atab === name);
+  });
+  $("adminOverview").classList.toggle("hidden", name !== "overview");
+  $("adminSettings").classList.toggle("hidden", name !== "settings");
+  $("adminUsers").classList.toggle("hidden", name !== "users");
 }
 
 // wired immediately (not inside wireEvents) so the switcher responds even
@@ -509,7 +526,11 @@ async function logout() {
 // ---------------------------------------------------------------- admin panel
 function renderAdminTab() {
   const admin = !!(state.me && state.me.is_admin);
-  $("adminTab").classList.toggle("hidden", !admin);
+  // admins land straight on the dashboard: no Save/History tabs, no top bar
+  $("saveTab").classList.toggle("hidden", admin);
+  $("historyTab").classList.toggle("hidden", admin);
+  $("appTabs").classList.toggle("hidden", admin);
+  if (admin && $("adminPanel").classList.contains("hidden")) activateAppTab("admin");
   if (!admin && !$("adminPanel").classList.contains("hidden")) activateAppTab("save");
 }
 
