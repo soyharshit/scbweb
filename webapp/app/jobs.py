@@ -48,6 +48,9 @@ class Job:
     id: str
     uid: int
     link: str
+    kind: str = "single"   # single | batch (N files forward) | multi (several links)
+    count: int = 0         # batch: target number of files
+    links: list[str] = field(default_factory=list)  # multi: every submitted link
     status: str = "queued"  # queued | running | done | error
     step: str = "Waiting..."
     percent: float = 0.0
@@ -80,6 +83,8 @@ def snapshot(job: Job) -> dict:
     return {
         "id": job.id,
         "link": job.link,
+        "kind": job.kind,
+        "count": job.count,
         "status": job.status,
         "step": job.step,
         "percent": round(job.percent, 1),
@@ -115,6 +120,8 @@ def history_doc(job: Job) -> dict:
         "id": job.id,
         "uid": job.uid,
         "link": job.link,
+        "kind": job.kind,
+        "count": job.count,
         "status": job.status,
         "step": job.step,
         "percent": round(float(job.percent), 1),
@@ -150,10 +157,18 @@ def cooldown_remaining(uid: int) -> int:
     return max(0, int(_COOLDOWN_UNTIL.get(uid, 0) - time.time()))
 
 
-def create_job(uid: int, link: str) -> Job:
+def create_job(uid: int, link: str, kind: str = "single", count: int = 0,
+               links: list[str] | None = None) -> Job:
     if active_job(uid) is not None:
         raise JobError("Another save is already in progress. Please wait for it to finish.")
-    job = Job(id=secrets.token_urlsafe(9), uid=uid, link=link.strip())
+    job = Job(
+        id=secrets.token_urlsafe(9),
+        uid=uid,
+        link=link.strip(),
+        kind=kind if kind in ("single", "batch", "multi") else "single",
+        count=max(0, int(count or 0)),
+        links=[l for l in (links or []) if l],
+    )
     JOBS[job.id] = job
     job.task = asyncio.get_running_loop().create_task(run_job(job))
     return job
@@ -281,7 +296,7 @@ def _downloadable(msg) -> bool:
     )
 
 
-async def _resolve_message(userbot, job: Job, parsed: dict):
+async def _resolve_message(userbot, job: Job, parsed: dict, require_content: bool = True):
     msg_id = parsed["msg_id"]
     chat_ids = list(parsed["chat_ids"])
 
@@ -378,7 +393,7 @@ async def _resolve_message(userbot, job: Job, parsed: dict):
     if msg.service:
         raise JobError("This is a service message with nothing to save.")
 
-    if not _has_content(msg):
+    if require_content and not _has_content(msg):
         raise JobError(
             "Message has no savable content.\n"
             "Supported: text, photos, videos, documents, audio, voice, stickers, animations, polls."
@@ -678,6 +693,82 @@ async def _run(job: Job) -> None:
     job.touch()
     await check_force_sub(userbot, me.id)
 
+    try:
+        if job.kind == "batch":
+            await _run_batch(userbot, job)
+        elif job.kind == "multi":
+            await _run_multi(userbot, job)
+        else:
+            await _run_single(userbot, job)
+    finally:
+        # Temp files are only needed while a re-upload is in flight.
+        shutil.rmtree(JOBS_DIR / job.id, ignore_errors=True)
+
+
+# ---------------------------------------------------------------------------
+# Shared pieces of every save mode
+# ---------------------------------------------------------------------------
+async def _quota_or_die(uid: int, getter, exhausted: str) -> None:
+    """Raise when this mode's rolling daily bucket is empty."""
+    remaining, reset_at = await getter(uid)
+    if remaining <= 0:
+        hrs = int((reset_at - time.time()) // 3600)
+        mins = int((reset_at - time.time()) % 3600 // 60)
+        raise JobError(f"{exhausted}\nResets in {hrs}h {mins}m.")
+
+
+async def _finish_save(job: Job, files: int) -> None:
+    """Site counters + cooldown shared by every successful save."""
+    try:
+        await db.increment_web_fetch()
+        await db.record_files_saved(files)
+    except Exception:
+        pass
+    if COOLDOWN_SECONDS > 0:
+        _COOLDOWN_UNTIL[job.uid] = time.time() + COOLDOWN_SECONDS
+
+
+def _store_result(job: Job, saved_ids: list[int], items: list[dict]) -> None:
+    job.items = items
+    job.saved_ids = saved_ids
+    job.open_url = f"tg://openmessage?user_id={job.uid}&message_id={saved_ids[0]}"
+
+
+def _no_content_error() -> JobError:
+    return JobError(
+        "Message has no savable content.\n"
+        "Supported: text, photos, videos, documents, audio, voice, stickers, animations, polls."
+    )
+
+
+async def _save_msg(userbot, job: Job, msg, parsed: dict):
+    """Forward one resolved message (and its album) to Saved Messages."""
+    msgs = [msg]
+    if msg.media_group_id and not parsed.get("single"):
+        try:
+            group = await userbot.get_media_group(msg.chat.id, msg.id)
+            msgs = sorted(group, key=lambda m: m.id)
+        except Exception:
+            msgs = [msg]
+    saved_ids, items, note = await _save_list(userbot, job, msgs)
+    return saved_ids, items, note, msgs
+
+
+async def _save_list(userbot, job: Job, msgs: list):
+    """Forward an already assembled message list to Saved Messages."""
+    items = _build_items(msgs)
+    if not items:
+        raise _no_content_error()
+    saved_ids, note = await _store_to_saved(userbot, job, msgs)
+    if not saved_ids:
+        raise JobError(note or "Could not save to Saved Messages. Please try again.")
+    return saved_ids, items, note
+
+
+# ---------------------------------------------------------------------------
+# Single save (invite join or one message / album)
+# ---------------------------------------------------------------------------
+async def _run_single(userbot, job: Job) -> None:
     parsed = parse_link(job.link)
 
     if parsed["kind"] == "invite":
@@ -686,66 +777,185 @@ async def _run(job: Job) -> None:
         job.message = await join_invite(userbot, parsed["link"])
         return
 
-    remaining, reset_at = await db.get_download_remaining(job.uid)
-    if remaining <= 0:
-        hrs = int((reset_at - time.time()) // 3600)
-        mins = int((reset_at - time.time()) % 3600 // 60)
-        raise JobError(
-            f"You've used all {DAILY_LIMIT} daily saves.\n"
-            f"Resets in {hrs}h {mins}m."
-        )
+    await _quota_or_die(job.uid, db.get_download_remaining,
+                        f"You've used all {DAILY_LIMIT} daily saves.")
 
-    try:
-        msg = await _resolve_message(userbot, job, parsed)
+    msg = await _resolve_message(userbot, job, parsed)
+    saved_ids, items, note, msgs = await _save_msg(userbot, job, msg, parsed)
 
-        # Media group (albums)
-        msgs = [msg]
-        if msg.media_group_id and not parsed.get("single"):
-            try:
-                group = await userbot.get_media_group(msg.chat.id, msg.id)
-                msgs = sorted(group, key=lambda m: m.id)
-            except Exception:
-                msgs = [msg]
+    text = _text_content(msg)
+    if text:
+        job.text = text[:MAX_TEXT_PREVIEW]
+    _store_result(job, saved_ids, items)
 
-        text = _text_content(msg)
-        if text:
-            job.text = text[:MAX_TEXT_PREVIEW]
+    await db.increment_download_count(job.uid)
+    await _finish_save(job, len(items))
 
-        job.items = _build_items(msgs)
-        if not job.items:
-            raise JobError(
-                "Message has no savable content.\n"
-                "Supported: text, photos, videos, documents, audio, voice, stickers, animations, polls."
-            )
+    total = len(msgs)
+    if len(saved_ids) == total:
+        job.message = "Saved to your Saved Messages." if total == 1 else \
+            f"Saved {total} messages to your Saved Messages."
+    else:
+        job.message = f"Saved {len(saved_ids)}/{total} messages to your Saved Messages."
+    if note:
+        job.message += f" {note}"
 
-        saved_ids, note = await _store_to_saved(userbot, job, msgs)
-        if not saved_ids:
-            raise JobError(note or "Could not save to Saved Messages. Please try again.")
 
-        job.saved_ids = saved_ids
-        job.open_url = f"tg://openmessage?user_id={job.uid}&message_id={saved_ids[0]}"
+# ---------------------------------------------------------------------------
+# Batch save (one link, keep saving files forward until N)
+# ---------------------------------------------------------------------------
+async def _collect_batch(userbot, job: Job, base) -> list:
+    """Walk messages newer than `base`, collecting downloadable media files."""
+    target = max(1, job.count or 1)
+    found: list = []
+    seen_ids: set = set()
+    seen_groups: set = set()
 
-        await db.increment_download_count(job.uid)
+    def _add(m) -> None:
+        if m is not None and not getattr(m, "empty", False) \
+                and m.id not in seen_ids and _downloadable(m):
+            seen_ids.add(m.id)
+            found.append(m)
+
+    _add(base)
+    if base.media_group_id:
+        seen_groups.add(base.media_group_id)
         try:
-            await db.increment_web_fetch()
-            await db.record_files_saved(len(job.items))
+            for g in await userbot.get_media_group(base.chat.id, base.id):
+                _add(g)
         except Exception:
             pass
 
-        if COOLDOWN_SECONDS > 0:
-            _COOLDOWN_UNTIL[job.uid] = time.time() + COOLDOWN_SECONDS
-
-        total = len(msgs)
-        if len(saved_ids) == total:
-            job.message = "Saved to your Saved Messages." if total == 1 else \
-                f"Saved {total} messages to your Saved Messages."
+    cap = min(target * 10, 500)
+    scanned = 0
+    empty_run = 0
+    next_id = base.id or 0
+    while len(found) < target and scanned < cap and empty_run < 50:
+        scanned += 1
+        next_id += 1
+        try:
+            m = await userbot.get_messages(base.chat.id, next_id)
+        except Exception:
+            m = None
+        if m is None or getattr(m, "empty", False) or not _has_content(m):
+            empty_run += 1
+            continue
+        empty_run = 0
+        if m.service:
+            continue
+        gid = getattr(m, "media_group_id", None)
+        if gid:
+            if gid in seen_groups:
+                continue
+            seen_groups.add(gid)
+            added = False
+            try:
+                group = await userbot.get_media_group(m.chat.id, m.id)
+                for g in sorted(group, key=lambda x: x.id):
+                    if _downloadable(g):
+                        _add(g)
+                        added = True
+            except Exception:
+                added = False
+            if not added:
+                _add(m)
         else:
-            job.message = f"Saved {len(saved_ids)}/{total} messages to your Saved Messages."
+            _add(m)
+        job.percent = min(50.0, len(found) / target * 50.0)
+        job.step = f"Finding files {len(found)}/{target}..."
+        job.touch()
+    return found[:target]
+
+
+async def _run_batch(userbot, job: Job) -> None:
+    parsed = parse_link(job.link)
+    if parsed["kind"] != "message":
+        raise JobError("Batch save needs a message link (https://t.me/...).")
+
+    await _quota_or_die(job.uid, db.get_bulk_remaining,
+                        "You've used all your bulk saves for today.")
+
+    base = await _resolve_message(userbot, job, parsed, require_content=False)
+
+    target = max(1, job.count or 1)
+    found = await _collect_batch(userbot, job, base)
+    if not found:
+        raise JobError("No savable files were found after this link.")
+
+    job.percent = 50.0
+    saved_ids, items, note = await _save_list(userbot, job, found)
+
+    text = _text_content(found[0])
+    if text:
+        job.text = text[:MAX_TEXT_PREVIEW]
+    _store_result(job, saved_ids, items)
+
+    await db.increment_bulk_count(job.uid)
+    await _finish_save(job, len(items))
+
+    if len(saved_ids) >= target:
+        job.message = f"Saved {len(saved_ids)} files to your Saved Messages."
+    else:
+        job.message = f"Saved {len(saved_ids)}/{target} files to your Saved Messages."
+    if note:
+        job.message += f" {note}"
+
+
+# ---------------------------------------------------------------------------
+# Multi save (several links, newline separated, saved together)
+# ---------------------------------------------------------------------------
+async def _run_multi(userbot, job: Job) -> None:
+    links = list(job.links) or [job.link]
+    total = len(links)
+
+    await _quota_or_die(job.uid, db.get_multi_remaining,
+                        "You've used all your multi-link saves for today.")
+
+    saved_all: list[int] = []
+    all_items: list[dict] = []
+    notes: list[str] = []
+    first_error: str | None = None
+    first_text: str | None = None
+    ok = 0
+
+    for i, link in enumerate(links, 1):
+        job.step = f"Saving link {i}/{total}..."
+        job.percent = (i - 1) / max(total, 1) * 100
+        job.touch()
+        try:
+            parsed = parse_link(link)
+            if parsed["kind"] != "message":
+                raise JobError("Multi-link saves need message links (https://t.me/...).")
+            msg = await _resolve_message(userbot, job, parsed)
+            saved_ids, items, note, _msgs = await _save_msg(userbot, job, msg, parsed)
+        except JobError as exc:
+            if first_error is None:
+                first_error = str(exc)
+            continue
+        ok += 1
+        saved_all.extend(saved_ids)
+        all_items.extend(items)
         if note:
-            job.message += f" {note}"
-    finally:
-        # Temp files are only needed while a re-upload is in flight.
-        shutil.rmtree(JOBS_DIR / job.id, ignore_errors=True)
+            notes.append(note)
+        if first_text is None:
+            first_text = _text_content(msg)
+
+    if not saved_all:
+        raise JobError(first_error or "Could not save to Saved Messages. Please try again.")
+
+    if first_text:
+        job.text = first_text[:MAX_TEXT_PREVIEW]
+    _store_result(job, saved_all, all_items)
+
+    await db.increment_multi_count(job.uid)
+    await _finish_save(job, len(all_items))
+
+    job.message = (
+        f"Saved {total} links to your Saved Messages." if ok >= total
+        else f"Saved {ok}/{total} links to your Saved Messages."
+    )
+    if notes:
+        job.message += " " + " ".join(dict.fromkeys(notes))
 
 
 # ---------------------------------------------------------------------------

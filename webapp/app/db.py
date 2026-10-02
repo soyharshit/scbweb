@@ -20,6 +20,8 @@ from .config import (
     HISTORY_LIMIT,
     ADMIN_PIN,
     ADMIN_UID,
+    BULK_SAVES_PER_DAY,
+    MULTI_SAVES_PER_DAY,
 )
 
 
@@ -147,36 +149,66 @@ class Database:
         return bool(user and user.get("log") and user.get("session"))
 
     # -- daily quota ---------------------------------------------------------
-    async def get_download_remaining(self, uid: int) -> tuple[int, int]:
-        """Returns (remaining, reset_at)."""
+    async def _quota_remaining(self, uid: int, count_field: str, reset_field: str,
+                               limit: int) -> tuple[int, int]:
+        """Returns (remaining, reset_at) for one rolling daily counter."""
         user = await self._users.find_one({"id": uid})
         if not user:
-            return DAILY_LIMIT, 0
+            return limit, 0
         now = time.time()
-        count = user.get("daily_download_count", 0)
-        reset_at = user.get("daily_download_reset_at", 0)
+        count = user.get(count_field, 0)
+        reset_at = user.get(reset_field, 0)
         if now >= reset_at:
             if count or reset_at:
                 await self._users.update_one(
                     {"id": uid},
-                    {"$set": {"daily_download_count": 0, "daily_download_reset_at": 0}},
+                    {"$set": {count_field: 0, reset_field: 0}},
                 )
-            return DAILY_LIMIT, 0
-        return max(0, DAILY_LIMIT - count), int(reset_at)
+            return limit, 0
+        return max(0, limit - count), int(reset_at)
 
-    async def increment_download_count(self, uid: int) -> None:
+    async def _quota_use(self, uid: int, count_field: str, reset_field: str) -> None:
+        """Consume one unit of a rolling daily counter (24h window)."""
         now = time.time()
         await self.add_user(uid)
         user = await self._users.find_one({"id": uid}) or {}
-        count = user.get("daily_download_count", 0)
-        reset_at = user.get("daily_download_reset_at", 0)
+        count = user.get(count_field, 0)
+        reset_at = user.get(reset_field, 0)
         if reset_at == 0 or now >= reset_at:
             await self._users.update_one(
                 {"id": uid},
-                {"$set": {"daily_download_count": 1, "daily_download_reset_at": now + 86400}},
+                {"$set": {count_field: 1, reset_field: now + 86400}},
             )
         else:
-            await self._users.update_one({"id": uid}, {"$set": {"daily_download_count": count + 1}})
+            await self._users.update_one({"id": uid}, {"$set": {count_field: count + 1}})
+
+    # single saves (per file job)
+    async def get_download_remaining(self, uid: int) -> tuple[int, int]:
+        """Returns (remaining, reset_at)."""
+        return await self._quota_remaining(
+            uid, "daily_download_count", "daily_download_reset_at", DAILY_LIMIT
+        )
+
+    async def increment_download_count(self, uid: int) -> None:
+        await self._quota_use(uid, "daily_download_count", "daily_download_reset_at")
+
+    # bulk saves (batch: N files from one link)
+    async def get_bulk_remaining(self, uid: int) -> tuple[int, int]:
+        return await self._quota_remaining(
+            uid, "bulk_count", "bulk_reset_at", BULK_SAVES_PER_DAY
+        )
+
+    async def increment_bulk_count(self, uid: int) -> None:
+        await self._quota_use(uid, "bulk_count", "bulk_reset_at")
+
+    # multi saves (several links in one submission)
+    async def get_multi_remaining(self, uid: int) -> tuple[int, int]:
+        return await self._quota_remaining(
+            uid, "multi_count", "multi_reset_at", MULTI_SAVES_PER_DAY
+        )
+
+    async def increment_multi_count(self, uid: int) -> None:
+        await self._quota_use(uid, "multi_count", "multi_reset_at")
 
     # -- web auth tokens -----------------------------------------------------
     @staticmethod

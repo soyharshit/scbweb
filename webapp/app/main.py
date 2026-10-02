@@ -18,10 +18,14 @@ from .config import (
     ADMIN_PIN_MIN,
     ADMIN_UID,
     AUTH_USERS,
+    BULK_MAX_FILES,
+    BULK_SAVES_PER_DAY,
     COOKIE_NAME,
     COOKIE_SECURE,
     DAILY_LIMIT,
     FORCESUB_NAME,
+    MULTI_MAX_LINKS,
+    MULTI_SAVES_PER_DAY,
     STATIC_DIR,
     TOKEN_TTL_SECONDS,
     WEB_HOST,
@@ -180,6 +184,8 @@ class SessionReq(BaseModel):
 
 class FetchReq(BaseModel):
     link: str = Field(min_length=1, max_length=8192)
+    mode: str = "single"          # single | batch | multi
+    count: int | None = None      # batch: how many files to save
 
 
 class BanReq(BaseModel):
@@ -305,6 +311,12 @@ async def me_endpoint(request: Request):
         return {"logged_in": False}
     remaining, reset_at = await db.get_download_remaining(uid)
     try:
+        bulk_remaining, _ = await db.get_bulk_remaining(uid)
+        multi_remaining, _ = await db.get_multi_remaining(uid)
+    except Exception:
+        log.exception("quota lookup failed")
+        bulk_remaining, multi_remaining = 0, 0
+    try:
         settings = await db.get_settings()
     except Exception:
         log.exception("settings lookup failed")
@@ -322,6 +334,12 @@ async def me_endpoint(request: Request):
         "daily_limit": DAILY_LIMIT,
         "remaining": remaining,
         "reset_at": reset_at,
+        "bulk_limit": BULK_SAVES_PER_DAY,
+        "bulk_max_files": BULK_MAX_FILES,
+        "bulk_remaining": bulk_remaining,
+        "multi_limit": MULTI_SAVES_PER_DAY,
+        "multi_max_links": MULTI_MAX_LINKS,
+        "multi_remaining": multi_remaining,
         "cooldown_remaining": jobs_mod.cooldown_remaining(uid),
         "force_sub": FORCESUB_NAME,
         "is_admin": admin,
@@ -350,15 +368,49 @@ async def visit_endpoint(request: Request):
 async def fetch_endpoint(req: FetchReq, request: Request):
     uid = await _require_uid(request)
 
-    link = jobs_mod.extract_link(req.link.strip())
-    if not link:
-        raise _ApiError(400, "Please paste a Telegram message link (https://t.me/...).")
-    if "t.me/" not in link and "telegram.me/" not in link:
-        raise _ApiError(400, "Only Telegram links are supported (t.me/...).")
-    try:
-        jobs_mod.parse_link(link)
-    except jobs_mod.JobError as exc:
-        raise _ApiError(400, str(exc))
+    mode = (req.mode or "single").strip().lower() or "single"
+    if mode not in ("single", "batch", "multi"):
+        raise _ApiError(400, "Unknown save mode.")
+
+    links: list[str] = []
+    count = 0
+    if mode == "multi":
+        lines = [x.strip() for x in req.link.splitlines() if x.strip()]
+        if not lines:
+            raise _ApiError(400, "Please paste a Telegram message link (https://t.me/...).")
+        if len(lines) > MULTI_MAX_LINKS:
+            raise _ApiError(400, f"You can save up to {MULTI_MAX_LINKS} links at once.")
+        for i, line in enumerate(lines, 1):
+            link = jobs_mod.extract_link(line)
+            if not link or ("t.me/" not in link and "telegram.me/" not in link):
+                raise _ApiError(400, f"Line {i} is not a valid Telegram link.")
+            try:
+                parsed = jobs_mod.parse_link(link)
+            except jobs_mod.JobError as exc:
+                raise _ApiError(400, str(exc))
+            if parsed["kind"] != "message":
+                raise _ApiError(400, "Multi-link saves need message links (https://t.me/...).")
+            links.append(link)
+        primary = links[0]
+    else:
+        link = jobs_mod.extract_link(req.link.strip())
+        if not link:
+            raise _ApiError(400, "Please paste a Telegram message link (https://t.me/...).")
+        if "t.me/" not in link and "telegram.me/" not in link:
+            raise _ApiError(400, "Only Telegram links are supported (t.me/...).")
+        try:
+            parsed = jobs_mod.parse_link(link)
+        except jobs_mod.JobError as exc:
+            raise _ApiError(400, str(exc))
+        if mode == "batch":
+            if parsed["kind"] != "message":
+                raise _ApiError(400, "Batch save needs a message link (https://t.me/...).")
+            if req.count is None or req.count < 1:
+                raise _ApiError(400, "Enter how many files to save.")
+            if req.count > BULK_MAX_FILES:
+                raise _ApiError(400, f"Batch save is limited to {BULK_MAX_FILES} files per run.")
+            count = req.count
+        primary = link
 
     if await db.is_banned(uid):
         raise _ApiError(403, "Your account has been banned.")
@@ -366,9 +418,18 @@ async def fetch_endpoint(req: FetchReq, request: Request):
     if not (await db.get_settings()).get("saving_enabled", True) and uid != ADMIN_UID:
         raise _ApiError(403, "Saving is temporarily disabled by the administrator.")
 
-    remaining, _ = await db.get_download_remaining(uid)
-    if remaining <= 0:
-        raise _ApiError(429, "You've used all your daily saves. Please try again later.")
+    if mode == "batch":
+        remaining, _ = await db.get_bulk_remaining(uid)
+        if remaining <= 0:
+            raise _ApiError(429, "You've used all your bulk saves for today. Please try again later.")
+    elif mode == "multi":
+        remaining, _ = await db.get_multi_remaining(uid)
+        if remaining <= 0:
+            raise _ApiError(429, "You've used all your multi-link saves for today. Please try again later.")
+    else:
+        remaining, _ = await db.get_download_remaining(uid)
+        if remaining <= 0:
+            raise _ApiError(429, "You've used all your daily saves. Please try again later.")
 
     cool = jobs_mod.cooldown_remaining(uid)
     if cool > 0:
@@ -376,7 +437,7 @@ async def fetch_endpoint(req: FetchReq, request: Request):
         raise _ApiError(429, f"Please wait {mins}m {secs}s before saving again.")
 
     try:
-        job = jobs_mod.create_job(uid, link)
+        job = jobs_mod.create_job(uid, primary, kind=mode, count=count, links=links)
     except jobs_mod.JobError as exc:
         raise _ApiError(409, str(exc))
     return {"job": jobs_mod.snapshot(job)}
@@ -387,6 +448,8 @@ def _with_defaults(d: dict) -> dict:
     d.setdefault("downloaded", 0)
     d.setdefault("total", 0)
     d.setdefault("speed", 0)
+    d.setdefault("kind", "single")
+    d.setdefault("count", 0)
     d.setdefault("saved_ids", [])
     d.setdefault("items", [])
     d.setdefault("error", None)

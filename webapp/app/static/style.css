@@ -276,7 +276,7 @@ code {
 }
 .input-wrap:focus-within .input-icon { color: var(--foreground); }
 
-input[type="text"], input[type="tel"], input[type="password"], textarea {
+input[type="text"], input[type="tel"], input[type="password"], input[type="number"], textarea {
   width: 100%;
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
@@ -289,6 +289,20 @@ input[type="text"], input[type="tel"], input[type="password"], textarea {
   box-shadow: var(--shadow-sm);
 }
 .input-wrap input { padding-inline-start: 35px; }
+
+/* multi-line link field (batch + multi-link saves) */
+.input-wrap.area { align-items: flex-start; }
+.input-wrap.area .input-icon { top: 13px; }
+.input-wrap.area textarea {
+  padding-inline-start: 35px;
+  font-family: inherit;
+  font-size: .87rem;
+  line-height: 1.45;
+  resize: none;
+  min-height: 40px;
+  overflow-y: hidden;
+}
+#batchCount { max-width: 170px; }
 input::placeholder, textarea::placeholder { color: var(--subtle-fg); }
 input:hover, textarea:hover { border-color: var(--border-strong); }
 input:focus, textarea:focus {
@@ -403,6 +417,8 @@ input.code-input:focus { background: var(--field); }
 }
 .pill strong { color: var(--foreground); font-weight: 600; }
 .pill.warn { background: #fef2f2; border-color: #fecaca; color: #b91c1c; }
+.kind-pill { font-size: .69rem; padding: 2px 9px; flex: none; }
+.job-item .kind-pill { align-self: center; }
 
 /* ---------- fetch row ---------- */
 .fetch-row { display: flex; gap: 9px; align-items: stretch; }
@@ -922,6 +938,7 @@ html[data-theme="dark"] .theme-btn .icon-moon { opacity: 0; transform: rotate(-8
 @media (max-width: 560px) {
   /* >=16px stops iOS Safari from auto-zooming on focus */
   input:not(.code-input), textarea { font-size: 16px; }
+  .input-wrap.area textarea { font-size: 16px; }
   .fetch-row { flex-direction: column; }
   .fetch-row .btn { width: 100%; }
   .brand-text small { display: none; }

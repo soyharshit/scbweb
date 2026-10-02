@@ -12,6 +12,7 @@ const state = {
   lastSeen: "",
   codeBusy: false,
   via: "",
+  batchOn: false,
 };
 
 // ---------------------------------------------------------------- API helper
@@ -25,7 +26,8 @@ async function api(path, opts = {}) {
   let data = {};
   try { data = await res.json(); } catch (_) { /* empty body */ }
   if (!res.ok) {
-    const err = new Error(data.error || t("req_failed", { code: res.status }));
+    const err = new Error(data.error ? translateServer(data.error)
+      : t("req_failed", { code: res.status }));
     err.status = res.status;
     throw err;
   }
@@ -198,6 +200,49 @@ function renderQuota() {
   const nb = $("noticeBanner");
   nb.textContent = notice;
   nb.classList.toggle("hidden", !notice);
+
+  updateLinkHints();
+}
+
+// batch / multi hints under the link field
+function updateLinkHints() {
+  const me = state.me || {};
+  const bh = $("batchHint");
+  if (bh) {
+    const max = me.bulk_max_files || 50;
+    const left = me.bulk_remaining;
+    let text = t("batch.max", { n: max });
+    if (left !== undefined && left !== null) {
+      text += " · " + (left > 0 ? t("batch.remaining", { n: left }) : t("batch.no_left"));
+    }
+    bh.textContent = text;
+    bh.classList.toggle("error", left === 0);
+  }
+  const mh = $("multiHint");
+  if (mh) {
+    const input = $("linkInput");
+    const lines = input
+      ? input.value.split(/\r?\n/).map((s) => s.trim()).filter(Boolean)
+      : [];
+    const max = me.multi_max_links || 5;
+    if (!state.batchOn && lines.length > 1) {
+      mh.textContent = lines.length > max
+        ? t("multi.err_max", { n: max })
+        : t("multi.count", { n: lines.length });
+      mh.classList.toggle("error", lines.length > max);
+      mh.classList.remove("hidden");
+    } else {
+      mh.classList.add("hidden");
+    }
+  }
+}
+
+// grow the link field to fit pasted multi-line content
+function autoGrow() {
+  const el = $("linkInput");
+  if (!el) return;
+  el.style.height = "auto";
+  el.style.height = Math.min(el.scrollHeight + 2, 220) + "px";
 }
 
 // re-render everything after a language change
@@ -246,7 +291,21 @@ function wireEvents() {
   });
 
   $("fetchBtn").addEventListener("click", doFetch);
-  $("linkInput").addEventListener("keydown", (e) => { if (e.key === "Enter") doFetch(); });
+  $("linkInput").addEventListener("input", () => { autoGrow(); updateLinkHints(); });
+  $("linkInput").addEventListener("keydown", (e) => {
+    if (e.key !== "Enter" || e.shiftKey) return;
+    // Enter sends a single-line entry; inside a multi-link paste it makes a new line
+    if (!$("linkInput").value.includes("\n")) {
+      e.preventDefault();
+      doFetch();
+    }
+  });
+  $("batchToggle").addEventListener("change", () => {
+    state.batchOn = $("batchToggle").checked;
+    $("batchBox").classList.toggle("hidden", !state.batchOn);
+    updateLinkHints();
+    if (state.batchOn) $("batchCount").focus();
+  });
 
   // admin panel
   $("adminRefreshBtn").addEventListener("click", refreshAdmin);
@@ -701,24 +760,52 @@ async function savePin() {
 }
 
 // ---------------------------------------------------------------- fetching
-async function doFetch() {
-  const link = $("linkInput").value.trim();
-  if (!link) { toast(t("toast.enter_link"), true); return; }
-  busy($("fetchBtn"), true);
-  try {
-    const r = await api("/api/fetch", { method: "POST", body: { link } });
-    state.selected = r.job.id;
-    renderJob(r.job);
-    activateAppTab("save");
-    await refreshJobs();
-    renderList();
-    startTicker();
-  } catch (e) {
-    toast(e.message, true);
-    if (e.status === 401) showLogin();
-  } finally {
-    busy($("fetchBtn"), false);
+function doFetch() {
+  const raw = $("linkInput").value;
+  const lines = raw.split(/\r?\n/).map((s) => s.trim()).filter(Boolean);
+  const me = state.me || {};
+
+  let mode = "single";
+  let body;
+  if (state.batchOn) {
+    if (!lines.length) { toast(t("toast.enter_link"), true); return; }
+    const n = parseInt($("batchCount").value, 10);
+    if (!n || n < 1) {
+      toast(t("batch.err_count"), true);
+      $("batchCount").focus();
+      return;
+    }
+    const max = me.bulk_max_files || 50;
+    if (n > max) { toast(t("batch.err_max", { n: max }), true); return; }
+    mode = "batch";
+    body = { link: lines[0], count: n };
+  } else if (lines.length > 1) {
+    const max = me.multi_max_links || 5;
+    if (lines.length > max) { toast(t("multi.err_max", { n: max }), true); return; }
+    mode = "multi";
+    body = { link: lines.join("\n") };
+  } else if (!lines.length) {
+    toast(t("toast.enter_link"), true);
+    return;
+  } else {
+    body = { link: lines[0] };
   }
+
+  busy($("fetchBtn"), true);
+  api("/api/fetch", { method: "POST", body: { ...body, mode } })
+    .then(async (r) => {
+      state.selected = r.job.id;
+      renderJob(r.job);
+      activateAppTab("save");
+      await refreshJobs();
+      renderList();
+      startTicker();
+    })
+    .catch((e) => {
+      toast(e.message, true);
+      if (e.status === 401) showLogin();
+    })
+    .finally(() => busy($("fetchBtn"), false));
 }
 
 async function refreshJobs() {
@@ -769,6 +856,14 @@ function renderJob(job) {
   const badge = $("jobStatus");
   badge.textContent = badgeLabel(job.status);
   badge.className = `badge ${job.status}`;
+
+  const kind = $("jobKind");
+  if (job.kind && job.kind !== "single") {
+    kind.textContent = t(`kind.${job.kind}`);
+    kind.classList.remove("hidden");
+  } else {
+    kind.classList.add("hidden");
+  }
 
   const running = job.status === "running" || job.status === "queued";
   const pct = job.percent || 0;
@@ -870,7 +965,14 @@ function renderList() {
     badge.className = `badge ${job.status}`;
     badge.textContent = badgeLabel(job.status);
 
-    li.append(left, badge);
+    li.append(left);
+    if (job.kind && job.kind !== "single") {
+      const kind = document.createElement("span");
+      kind.className = "pill kind-pill";
+      kind.textContent = t(`kind.${job.kind}`);
+      li.appendChild(kind);
+    }
+    li.appendChild(badge);
     li.addEventListener("click", () => {
       state.selected = job.id;
       renderJob(job);

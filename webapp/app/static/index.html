@@ -20,7 +20,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/style.css?v=4">
+  <link rel="stylesheet" href="/style.css?v=5">
 </head>
 <body>
   <header class="topbar">
@@ -166,12 +166,12 @@
           </div>
 
           <div class="fetch-row">
-            <div class="input-wrap grow">
+            <div class="input-wrap grow area">
               <span class="input-icon" aria-hidden="true">
                 <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
               </span>
-              <input id="linkInput" type="text" spellcheck="false" autocomplete="off"
-                     placeholder="https://t.me/channel/123">
+              <textarea id="linkInput" rows="1" spellcheck="false" autocomplete="off"
+                        placeholder="https://t.me/channel/123"></textarea>
             </div>
             <button id="fetchBtn" class="btn btn-primary" type="button">
               <span class="btn-label" data-i18n="save.btn">Save</span>
@@ -181,6 +181,21 @@
 
           <div class="hint-row">
             <span class="muted small" data-i18n-html="save.hint">Public links · private <code>t.me/c/…</code> · invite links · albums</span>
+          </div>
+
+          <div class="opt-row">
+            <label class="switch-row">
+              <input type="checkbox" id="batchToggle">
+              <span class="switch" aria-hidden="true"></span>
+              <span data-i18n="batch.toggle">Batch save</span>
+            </label>
+            <p class="field-hint" data-i18n="batch.toggle_hint">Keep saving files after this link until you reach your number.</p>
+            <div id="batchBox" class="field hidden">
+              <label for="batchCount" data-i18n="batch.how_many">How many files?</label>
+              <input id="batchCount" type="number" inputmode="numeric" min="1" step="1" placeholder="10">
+              <p id="batchHint" class="field-hint"></p>
+            </div>
+            <p id="multiHint" class="field-hint hidden"></p>
           </div>
 
           <div id="forceSubBanner" class="alert hidden"></div>
@@ -193,6 +208,7 @@
             <div class="job-head-left">
               <div class="job-titlerow">
                 <span id="jobStatus" class="badge" data-i18n="status.queued">queued</span>
+                <span id="jobKind" class="pill kind-pill hidden"></span>
                 <span id="jobPct" class="job-pct">0%</span>
               </div>
               <a id="jobLink" class="job-link" target="_blank" rel="noopener"></a>
@@ -403,7 +419,7 @@
   </div>
 
   <div id="toast" class="toast hidden"></div>
-  <script src="/i18n.js?v=4"></script>
-  <script src="/app.js?v=4"></script>
+  <script src="/i18n.js?v=5"></script>
+  <script src="/app.js?v=5"></script>
 </body>
 </html>

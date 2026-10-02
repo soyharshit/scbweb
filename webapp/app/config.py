@@ -73,6 +73,14 @@ ADMIN_PIN = (os.getenv("ADMIN_PIN") or "").strip() or "123456"
 ADMIN_PIN_MIN = 6
 ADMIN_PIN_MAX = 12
 
+# --- Batch save (one link, keep saving files forward until N) ----------------
+BULK_SAVES_PER_DAY = getenv_int("BULK_SAVES_PER_DAY", 1)
+BULK_MAX_FILES = getenv_int("BULK_MAX_FILES", 50)
+
+# --- Multiple links saved together (newline separated in the link field) -----
+MULTI_SAVES_PER_DAY = getenv_int("MULTI_SAVES_PER_DAY", 2)
+MULTI_MAX_LINKS = getenv_int("MULTI_MAX_LINKS", 5)
+
 # --- Limits / jobs ----------------------------------------------------------
 DAILY_LIMIT = getenv_int("DAILY_LIMIT", 20)
 COOLDOWN_SECONDS = getenv_int("COOLDOWN_SECONDS", 0)
