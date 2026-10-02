@@ -32,7 +32,18 @@ async def activate(client: Client) -> None:
         await client.initialize()
 
 
-def cache_client(uid: int, client: Client) -> None:
+def _bind_me(client, me) -> None:
+    """Pyrogram fills client.me only inside Client.start(); the web client uses
+    connect() instead, so we bind it here. save_file() reads me.is_premium on
+    every download/upload and crashes when the attribute is missing."""
+    if me is None:
+        return
+    client.me = me
+    client._is_premium = bool(getattr(me, "is_premium", False))
+
+
+def cache_client(uid: int, client: Client, me=None) -> None:
+    _bind_me(client, me)
     _clients[uid] = client
 
 
@@ -53,7 +64,7 @@ async def get_userbot(uid: int) -> Client:
     client = _clients.get(uid)
     if client is not None:
         try:
-            await client.get_me()
+            _bind_me(client, await client.get_me())
             return client
         except Exception:
             await drop_userbot(uid)
@@ -85,8 +96,7 @@ async def get_userbot(uid: int) -> Client:
             pass
         raise LoginRequired(f"Could not start your Telegram session: {exc}")
 
-    client.me = me
-    client._is_premium = bool(getattr(me, "is_premium", False))
+    _bind_me(client, me)
     _clients[uid] = client
     if me.first_name:
         try:

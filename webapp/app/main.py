@@ -221,7 +221,7 @@ async def _complete_login(response: Response, me, session: str, client,
     uid = me.id
     await db.add_user(uid, phone=phone, ip=ip)
     await db.store_login(uid, API_ID, API_HASH, session, getattr(me, "first_name", None))
-    tg.cache_client(uid, client)
+    tg.cache_client(uid, client, me)
     token = await db.create_token(uid)
     _set_cookie(response, token)
     name = getattr(me, "first_name", None) or getattr(me, "username", None) or f"User {uid}"
