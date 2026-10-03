@@ -336,9 +336,10 @@ function wireEvents() {
   $("abortBtn").addEventListener("click", abortJob);
   $("linkInput").addEventListener("input", () => { autoGrow(); updateLinkHints(); });
   $("linkInput").addEventListener("keydown", (e) => {
-    if (e.key !== "Enter" || e.shiftKey) return;
-    // Enter sends a single-line entry; inside a multi-link paste it makes a new line
-    if (!$("linkInput").value.includes("\n")) {
+    if (e.key !== "Enter") return;
+    // Enter always starts a new line, so several links can be typed or pasted
+    // one per line; Ctrl/Cmd + Enter sends the save instead.
+    if (e.ctrlKey || e.metaKey) {
       e.preventDefault();
       doFetch();
     }
