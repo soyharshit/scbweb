@@ -219,6 +219,7 @@ const I18N = {
     "sec.ok": "Yes, it's me",
     "status.aborted": "stopped",
     "job.abort": "Stop",
+    "err.stalled": "Telegram stopped responding. Please try again.",
     "step.stopped": "Stopped",
     "step.resuming": "Resuming...",
     "step.flood_wait": "Rate limited by Telegram, waiting {1}s",
@@ -439,6 +440,7 @@ const I18N = {
     "sec.ok": "Sí, soy yo",
     "status.aborted": "detenido",
     "job.abort": "Detener",
+    "err.stalled": "Telegram dejó de responder. Inténtalo de nuevo.",
     "step.stopped": "Detenido",
     "step.resuming": "Reanudando...",
     "step.flood_wait": "Limitado por Telegram, esperando {1} s",
@@ -659,6 +661,7 @@ const I18N = {
     "sec.ok": "Oui, c'est moi",
     "status.aborted": "arrêté",
     "job.abort": "Arrêter",
+    "err.stalled": "Telegram ne répond plus. Réessayez.",
     "step.stopped": "Arrêté",
     "step.resuming": "Reprise...",
     "step.flood_wait": "Limité par Telegram, attente de {1} s",
@@ -879,6 +882,7 @@ const I18N = {
     "sec.ok": "نعم، أنا",
     "status.aborted": "متوقف",
     "job.abort": "إيقاف",
+    "err.stalled": "توقف تيليجرام عن الاستجابة. حاول مرة أخرى.",
     "step.stopped": "متوقف",
     "step.resuming": "جارٍ الاستئناف...",
     "step.flood_wait": "تم تحديدك من تيليجرام، انتظار {1} ث",
@@ -1099,6 +1103,7 @@ const I18N = {
     "sec.ok": "Да, это я",
     "status.aborted": "остановлено",
     "job.abort": "Остановить",
+    "err.stalled": "Telegram не отвечает. Попробуйте снова.",
     "step.stopped": "Остановлено",
     "step.resuming": "Продолжаем...",
     "step.flood_wait": "Ограничение Telegram, ожидание {1} с",
@@ -1319,6 +1324,7 @@ const I18N = {
     "sec.ok": "是的，是我",
     "status.aborted": "已停止",
     "job.abort": "停止",
+    "err.stalled": "Telegram 没有响应，请重试。",
     "step.stopped": "已停止",
     "step.resuming": "继续处理...",
     "step.flood_wait": "被 Telegram 限流，等待 {1} 秒",
@@ -1539,6 +1545,7 @@ const I18N = {
     "sec.ok": "Sim, sou eu",
     "status.aborted": "parado",
     "job.abort": "Parar",
+    "err.stalled": "O Telegram parou de responder. Tente novamente.",
     "step.stopped": "Parado",
     "step.resuming": "Retomando...",
     "step.flood_wait": "Limitado pelo Telegram, aguardando {1}s",
@@ -1759,6 +1766,7 @@ const I18N = {
     "sec.ok": "Ya, itu saya",
     "status.aborted": "dihentikan",
     "job.abort": "Hentikan",
+    "err.stalled": "Telegram berhenti merespons. Coba lagi.",
     "step.stopped": "Dihentikan",
     "step.resuming": "Melanjutkan...",
     "step.flood_wait": "Dibatasi Telegram, menunggu {1} d",
@@ -1829,7 +1837,8 @@ const SERVER_EXACT = {
   "Unknown save mode.": "err.mode",
   "This job has already finished.": "err.job_finished",
   "Stopped": "step.stopped",
-  "Resuming...": "step.resuming"
+  "Resuming...": "step.resuming",
+  "Telegram stopped responding. Please try again.": "err.stalled"
 };
 
 const SERVER_PATTERNS = [

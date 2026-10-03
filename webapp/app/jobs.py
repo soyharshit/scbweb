@@ -24,6 +24,7 @@ from .config import (
     COOLDOWN_SECONDS,
     FREE_SPACE_RESERVE,
     MAX_TEXT_PREVIEW,
+    getenv_int,
 )
 from .db import db
 from .tg import (
@@ -233,6 +234,8 @@ def abort_job(job: Job) -> None:
 # ---------------------------------------------------------------------------
 MAX_FLOOD_WAIT = 300      # never hold one call longer than this ...
 MAX_FLOOD_TOTAL = 900     # ... and never hold a whole job longer than this
+CALL_TIMEOUT_SECONDS = getenv_int("CALL_TIMEOUT_SECONDS", 900)   # a dead connection
+STUCK_JOB_SECONDS = getenv_int("STUCK_JOB_SECONDS", 2700)      # 45 min without progress
 
 
 async def _flood_sleep(job: Job, seconds: float) -> None:
@@ -259,7 +262,10 @@ async def _call(job: Job, what: str, fn):
     spent = 0
     while True:
         try:
-            return await fn()
+            return await asyncio.wait_for(fn(), CALL_TIMEOUT_SECONDS)
+        except asyncio.TimeoutError:
+            # a dropped connection would otherwise hang the job forever
+            raise JobError("Telegram stopped responding. Please try again.") from None
         except FloodWait as fw:
             delay = int(fw.value or 1)
             if delay > MAX_FLOOD_WAIT or spent + delay > MAX_FLOOD_TOTAL:
@@ -1062,6 +1068,32 @@ def clean_orphan_dirs() -> int:
     return removed
 
 
+def sweep_orphan_folders() -> int:
+    """Remove job folders whose job no longer exists in memory.
+
+    A normal job deletes its own folder when it finishes; this catches the
+    rest (a killed process, a folder left behind by a failed removal) while
+    the server keeps running.
+    """
+    if not JOBS_DIR.exists():
+        return 0
+    live = set(JOBS.keys())
+    removed = 0
+    for entry in list(JOBS_DIR.iterdir()):
+        if entry.name in live:
+            continue          # still being written to by a live job
+        try:
+            if entry.is_dir():
+                shutil.rmtree(entry, ignore_errors=True)
+            else:
+                entry.unlink()
+            removed += 1
+            log.warning("Removed orphan job folder %s", entry.name)
+        except OSError:
+            pass
+    return removed
+
+
 async def cleanup_loop(interval: int = 60) -> None:
     while True:
         try:
@@ -1074,7 +1106,7 @@ async def cleanup_loop(interval: int = 60) -> None:
             # Safety net for jobs stuck running (e.g. the server died mid-flight)
             stale += [
                 jid for jid, job in JOBS.items()
-                if job.status in ("queued", "running") and now - job.updated > 6 * 3600
+                if job.status in ("queued", "running") and now - job.updated > STUCK_JOB_SECONDS
             ]
             for jid in stale:
                 job = JOBS.pop(jid, None)
@@ -1083,6 +1115,7 @@ async def cleanup_loop(interval: int = 60) -> None:
                 shutil.rmtree(JOBS_DIR / jid, ignore_errors=True)
             for uid in [u for u, t in _COOLDOWN_UNTIL.items() if t <= now]:
                 _COOLDOWN_UNTIL.pop(uid, None)
+            sweep_orphan_folders()   # self-heal: no job, no folder
             from .auth import sweep_pending
             sweep_pending()
         except asyncio.CancelledError:
