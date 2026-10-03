@@ -13,6 +13,16 @@ log = logging.getLogger("webapp.tg")
 
 _clients: dict[int, Client] = {}
 
+# How every session this site creates presents itself to Telegram. Telegram
+# shows this in Active Sessions and inside the "new login" alert, so it has to
+# read as this app rather than as an anonymous script (CPython/Linux), which is
+# what a user would otherwise see and distrust.
+SESSION_DEVICE = {
+    "device_model": "Telegram Saver",
+    "system_version": "Web",
+    "app_version": "Telegram Saver",
+}
+
 
 class LoginRequired(Exception):
     """Raised when the user has no usable Telegram session."""
@@ -79,6 +89,7 @@ async def get_userbot(uid: int) -> Client:
         api_hash=api_hash or API_HASH,
         session_string=session,
         in_memory=True,
+        **SESSION_DEVICE,
     )
     try:
         authorized = await client.connect()

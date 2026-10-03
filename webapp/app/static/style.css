@@ -109,7 +109,8 @@ code {
 .fade-in { animation: fadeIn .3s var(--ease) both; }
 
 @media (prefers-reduced-motion: reduce) {
-  .anim, .fade-in, .toast, .result, .items li, .modal-backdrop, .modal { animation: none !important; opacity: 1 !important; }
+  .anim, .fade-in, .toast, .result, .items li, .modal-backdrop, .modal, .tg-notice, .empty-state { animation: none !important; opacity: 1 !important; }
+  .tg-notice-ok { animation: none !important; box-shadow: none !important; }
   .sk { animation: none !important; background: var(--muted) !important; }
   * { transition-duration: .01ms !important; }
 }
@@ -346,6 +347,8 @@ textarea { resize: vertical; font-family: ui-monospace, SFMono-Regular, Menlo, C
 .hint-text { color: var(--muted-fg); font-size: .8rem; margin: 12px 0 0; line-height: 1.55; overflow-wrap: anywhere; }
 .hint-text:not(.hidden) { animation: fadeIn .3s var(--ease) both; }
 .field-hint { color: var(--subtle-fg); font-size: .76rem; margin: 7px 0 0; text-align: center; }
+/* under the link field the copy sits with the rest of the form: left aligned */
+#enterHint { text-align: start; }
 
 /* ---------- confirmation code (OTP) ---------- */
 .code-field { margin-top: 16px; }
@@ -643,6 +646,27 @@ input.code-input:focus { background: var(--field); }
 .job-item-time { color: var(--subtle-fg); font-size: .74rem; margin-top: 2px; overflow-wrap: anywhere; }
 .empty { margin: 4px 0 0; overflow-wrap: anywhere; }
 
+/* history empty state: icon over a single line of copy */
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 11px;
+  padding: 14px 0 6px;
+  animation: fadeIn .35s var(--ease) both;
+}
+.empty-icon {
+  display: grid;
+  place-items: center;
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  background: var(--muted);
+  border: 1px solid var(--border);
+  color: var(--subtle-fg);
+}
+.empty-text { margin: 0; font-size: .84rem; color: var(--muted-fg); text-align: center; overflow-wrap: anywhere; }
+
 /* ---------- toast ---------- */
 .toast {
   position: fixed;
@@ -705,10 +729,49 @@ input.code-input:focus { background: var(--field); }
   background: #fef2f2;
   color: var(--destructive);
 }
+/* the tone follows the message: red only for destructive actions */
+.modal-icon.neutral { background: var(--muted); border: 1px solid var(--border); color: var(--foreground); }
+.modal-icon.info { background: #eff6ff; color: #2563eb; }
 .modal-title { margin: 0; font-size: 1.02rem; font-weight: 600; letter-spacing: -.01em; }
 .modal-desc { margin: 7px 0 0; font-size: .84rem; line-height: 1.55; color: var(--muted-fg); overflow-wrap: anywhere; }
+.modal-hint { margin: 12px 0 0; font-size: .79rem; line-height: 1.5; color: var(--subtle-fg); overflow-wrap: anywhere; }
 .modal-actions { display: flex; gap: 9px; margin-top: 18px; }
 .modal-actions .btn { flex: 1; margin-top: 0; padding-inline: 8px; }
+
+/* replica of Telegram's own "new login" alert, shown inside the prompt */
+.tg-notice {
+  margin-top: 14px;
+  padding: 12px 13px;
+  background: var(--field);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-sm);
+  text-align: start;
+  animation: fadeUp .4s var(--ease) both;
+}
+.tg-notice-title { font-size: .85rem; font-weight: 600; letter-spacing: -.01em; }
+.tg-notice-meta { font-size: .77rem; color: var(--muted-fg); margin-top: 4px; }
+.tg-notice-when { color: var(--subtle-fg); }
+.tg-notice-actions { display: flex; justify-content: flex-end; align-items: center; gap: 6px; margin-top: 10px; }
+.tg-notice-btn {
+  font-size: .77rem;
+  font-weight: 600;
+  color: var(--muted-fg);
+  padding: 5px 9px;
+  border-radius: 8px;
+  white-space: nowrap;
+}
+/* the button to tap in Telegram is the one that stands out */
+.tg-notice-ok {
+  color: #2563eb;
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  animation: noticeGlow 2.6s var(--ease) infinite;
+}
+@keyframes noticeGlow {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(37, 99, 235, .28); }
+  50%      { box-shadow: 0 0 0 5px rgba(37, 99, 235, 0); }
+}
 
 /* ---------- skeleton loaders ---------- */
 .sk {
@@ -966,7 +1029,18 @@ html[data-theme="dark"] .alert-green {
   border-color: rgba(74, 222, 128, .3);
   color: #4ade80;
 }
-html[data-theme="dark"] .modal-icon { background: rgba(248, 113, 113, .14); }
+html[data-theme="dark"] .modal-icon { background: rgba(248, 113, 113, .14); color: #f87171; }
+html[data-theme="dark"] .modal-icon.neutral {
+  background: rgba(250, 250, 250, .07);
+  border-color: var(--border);
+  color: var(--foreground);
+}
+html[data-theme="dark"] .modal-icon.info { background: rgba(96, 165, 250, .14); color: #60a5fa; }
+html[data-theme="dark"] .tg-notice-ok {
+  background: rgba(96, 165, 250, .14);
+  border-color: rgba(96, 165, 250, .34);
+  color: #93c5fd;
+}
 html[data-theme="dark"] .sk {
   background-image: linear-gradient(90deg, #202026 25%, #2a2a31 50%, #202026 75%);
 }

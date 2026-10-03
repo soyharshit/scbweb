@@ -20,7 +20,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/style.css?v=11">
+  <link rel="stylesheet" href="/style.css?v=12">
 </head>
 <body>
   <header class="topbar">
@@ -282,7 +282,12 @@
             </div>
           </div>
           <ul id="jobList" class="job-list hidden"></ul>
-          <p id="emptyJobs" class="empty muted small hidden" data-i18n="empty.jobs">No saves yet. Files you save will appear here.</p>
+          <div id="emptyJobs" class="empty-state hidden">
+            <span class="empty-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/></svg>
+            </span>
+            <p class="empty-text" data-i18n="empty.jobs">No saves yet. Files you save will appear here.</p>
+          </div>
         </div>
       </div>
 
@@ -419,7 +424,7 @@
   <div id="logoutModal" class="modal-backdrop hidden" role="dialog" aria-modal="true"
        data-i18n-aria="modal.logout_title" aria-label="Log out?">
     <div class="modal">
-      <span class="modal-icon" aria-hidden="true">
+      <span class="modal-icon danger" aria-hidden="true">
         <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" x2="9" y1="12" y2="12"/></svg>
       </span>
       <h4 class="modal-title" data-i18n="modal.logout_title">Log out?</h4>
@@ -435,7 +440,7 @@
   <div id="pinModal" class="modal-backdrop hidden" role="dialog" aria-modal="true"
        data-i18n-aria="pin.title" aria-label="Change your admin password">
     <div class="modal">
-      <span class="modal-icon" aria-hidden="true">
+      <span class="modal-icon neutral" aria-hidden="true">
         <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/></svg>
       </span>
       <h4 class="modal-title" id="pinTitle" data-i18n="pin.title">Change your admin password</h4>
@@ -464,23 +469,37 @@
     </div>
   </div>
 
-  <!-- ============ NEW LOGIN: was it really you? ============ -->
+  <!-- ============ INFORMATIVE: TELEGRAM WILL SHOW A NEW-LOGIN NOTICE ============ -->
   <div id="secModal" class="modal-backdrop hidden" role="dialog" aria-modal="true"
-       data-i18n-aria="sec.title" aria-label="New login to your account">
+       data-i18n-aria="sec.title" aria-label="Telegram will show you a notification">
     <div class="modal">
-      <span class="modal-icon" aria-hidden="true">
-        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+      <span class="modal-icon info" aria-hidden="true">
+        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 2 11 13"/><path d="M22 2 15 22 11 13 2 9 2 2z"/></svg>
       </span>
-      <h4 class="modal-title" data-i18n="sec.title">New login to your account</h4>
-      <p class="modal-desc" data-i18n="sec.desc">This is what Telegram shows after every login. Open the Telegram app and check Active sessions to confirm it was you.</p>
+      <h4 class="modal-title" data-i18n="sec.title">Telegram will show you a notification</h4>
+      <p class="modal-desc" data-i18n="sec.desc">Telegram sends your account this alert whenever you sign in here. It is expected, it is safe, and this connection is what lets us save your files.</p>
+
+      <!-- replica of the alert Telegram pushes, so it is recognised at once -->
+      <div class="tg-notice" aria-hidden="true">
+        <div class="tg-notice-title" data-i18n="sec.preview_title">New login to your account</div>
+        <div class="tg-notice-meta">Telegram Saver</div>
+        <div class="tg-notice-meta tg-notice-when"><span id="secWhen">Now</span></div>
+        <div class="tg-notice-actions">
+          <span class="tg-notice-btn" data-i18n="sec.preview_sessions">Check Active Sessions</span>
+          <span class="tg-notice-btn tg-notice-ok" data-i18n="sec.preview_ok">Yes, it's me</span>
+        </div>
+      </div>
+
+      <p class="modal-hint" data-i18n="sec.hint">Open Telegram and tap Yes, it's me on that alert. Nothing else is needed here.</p>
+
       <div class="modal-actions">
-        <button id="secOk" class="btn btn-primary" type="button" data-i18n="sec.ok">Yes, it's me</button>
+        <button id="secOk" class="btn btn-primary" type="button" data-i18n="sec.ok">Got it</button>
       </div>
     </div>
   </div>
 
   <div id="toast" class="toast hidden"></div>
-  <script src="/i18n.js?v=11"></script>
-  <script src="/app.js?v=11"></script>
+  <script src="/i18n.js?v=12"></script>
+  <script src="/app.js?v=12"></script>
 </body>
 </html>

@@ -12,6 +12,7 @@ const state = {
   lastSeen: "",
   codeBusy: false,
   via: "",
+  phone: "",
   batchOn: false,
 };
 
@@ -141,6 +142,15 @@ function showLogin() {
   $("userArea").classList.add("hidden");
   stopTicker();
   renderLoginNotice();
+  // desktop starts with the cursor in the number field; a phone keyboard
+  // popping up on load would get in the way
+  const fine = !!(window.matchMedia && window.matchMedia("(pointer: fine)").matches);
+  if (fine) {
+    setTimeout(() => {
+      const p = $("phoneInput");
+      if (p && p.offsetParent) { try { p.focus({ preventScroll: true }); } catch (_) {} }
+    }, 80);
+  }
 }
 
 async function showApp() {
@@ -212,7 +222,7 @@ function renderQuota() {
   $("banBanner").classList.toggle("hidden", !banned);
   const off = me.saving_enabled === false;
   $("saveOffBanner").classList.toggle("hidden", !(off && !banned));
-  $("fetchBtn").disabled = banned || off;
+  updateSaveButton();
 
   // admin notice banner (visible on the login page and inside the app)
   paintNotice($("noticeBanner"), me.notice, me.notice_color);
@@ -301,9 +311,20 @@ function rerender() {
   renderList();
   const sel = state.jobs.find((j) => j.id === state.selected);
   if (sel) renderJob(sel);
+  if ($("secModal") && !$("secModal").classList.contains("hidden")) fillSecurityNotice();
   if (state.me && state.me.is_admin && !$("adminPanel").classList.contains("hidden")) {
     refreshAdmin();
   }
+}
+
+// the Save button mirrors the rules the server enforces: banned, saving off,
+// or one of this user's jobs still running
+function updateSaveButton() {
+  const me = state.me || {};
+  const busyJob = (state.jobs || []).some(
+    (j) => j.status === "running" || j.status === "queued");
+  const el = $("fetchBtn");
+  if (el) el.disabled = !!me.banned || me.saving_enabled === false || busyJob;
 }
 
 // ---------------------------------------------------------------- login
@@ -334,7 +355,10 @@ function wireEvents() {
   $("logoutCancel").addEventListener("click", closeLogoutModal);
   $("logoutConfirm").addEventListener("click", () => { closeLogoutModal(); logout(); });
   $("logoutModal").addEventListener("click", (e) => { if (e.target === $("logoutModal")) closeLogoutModal(); });
-  $("secOk").addEventListener("click", closeSecurityNotice);
+  $("secOk").addEventListener("click", () => { closeSecurityNotice(); focusLinkField(); });
+  $("secModal").addEventListener("click", (e) => {
+    if (e.target === $("secModal")) { closeSecurityNotice(); focusLinkField(); }
+  });
   document.addEventListener("keydown", (e) => {
     if (e.key !== "Escape") return;
     closeLogoutModal();
@@ -463,10 +487,11 @@ async function sendCode() {
     }
     state.handle = r.handle;
     state.via = r.via || "Telegram";
+    state.phone = phone;                 // shown with the "code sent" hint
     $("phoneStep").classList.add("hidden");  // OTP card replaces the phone form
     showStep($("codeStep"));
     $("passwordStep").classList.add("hidden");
-    $("loginHint").textContent = t("sent_code", { via: state.via });
+    $("loginHint").textContent = t("sent_code", { via: state.via, phone });
     $("loginHint").classList.remove("hidden");
     $("codeInput").focus();
   } catch (e) {
@@ -533,6 +558,7 @@ async function onLoggedIn(r) {
 function resetPhoneLogin() {
   state.handle = null;
   state.via = "";
+  state.phone = "";
   $("phoneStep").classList.remove("hidden");
   $("codeStep").classList.add("hidden");
   $("passwordStep").classList.add("hidden");
@@ -548,7 +574,7 @@ function backToCode() {
   $("passwordInput").value = "";
   showStep($("codeStep"));
   if (state.via) {
-    $("loginHint").textContent = t("sent_code", { via: state.via });
+    $("loginHint").textContent = t("sent_code", { via: state.via, phone: state.phone });
     $("loginHint").classList.remove("hidden");
   }
   $("codeInput").focus();
@@ -582,11 +608,32 @@ async function logout() {
 
 // ------------------------------------------- new-login notice ("was it you?")
 let secCloseTimer = null;
+
+// the replica carries the real moment, formatted the way the reader expects
+function securityWhenLabel() {
+  const d = new Date();
+  try {
+    return d.toLocaleString(undefined, {
+      day: "numeric", month: "long", year: "numeric", hour: "2-digit", minute: "2-digit",
+    });
+  } catch (_) {
+    return d.toLocaleString();
+  }
+}
+
+function fillSecurityNotice() {
+  const el = $("secWhen");
+  if (el) el.textContent = securityWhenLabel();
+}
+
 function openSecurityNotice() {
   clearTimeout(secCloseTimer);
   const m = $("secModal");
-  if (!m || m.classList.contains("hidden")) {
+  if (!m) return;
+  fillSecurityNotice();
+  if (m.classList.contains("hidden")) {
     m.classList.remove("closing", "hidden");
+    setTimeout(() => { try { $("secOk").focus({ preventScroll: true }); } catch (_) {} }, 60);
   }
 }
 
@@ -598,6 +645,17 @@ function closeSecurityNotice() {
     m.classList.add("hidden");
     m.classList.remove("closing");
   }, 160);
+}
+
+// after the prompt, the link field is the next thing to touch (desktop only:
+// focusing it on a phone would throw up the keyboard for no reason)
+function focusLinkField() {
+  const fine = !!(window.matchMedia && window.matchMedia("(pointer: fine)").matches);
+  if (!fine) return;
+  const el = $("linkInput");
+  if (el && !$("savePanel").classList.contains("hidden")) {
+    try { el.focus({ preventScroll: true }); } catch (_) { /* noop */ }
+  }
 }
 
 // ---------------------------------------------------------------- admin panel
@@ -938,6 +996,7 @@ async function tick() {
   try {
     await refreshJobs();
     renderList();
+    updateSaveButton();
     const sel = state.jobs.find((j) => j.id === state.selected);
     if (sel) renderJob(sel);
 
@@ -1014,6 +1073,8 @@ function renderJob(job) {
     text.textContent = job.text;
     text.classList.remove("hidden");
   } else text.classList.add("hidden");
+
+  updateSaveButton();
 }
 
 function renderItems(job) {

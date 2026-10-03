@@ -106,7 +106,9 @@ async def start_phone_login(phone: str) -> dict:
     if len(_PENDING) > 500:
         raise LoginError("Too many pending logins right now. Try again in a minute.")
 
-    client = Client("web_login", api_id=API_ID, api_hash=API_HASH, in_memory=True)
+    client = Client(
+        "web_login", api_id=API_ID, api_hash=API_HASH, in_memory=True, **tg.SESSION_DEVICE
+    )
     try:
         await client.connect()
         sent = await client.send_code(phone)
@@ -209,7 +211,8 @@ async def login_with_session(session: str) -> dict:
         raise LoginError("That session string is too short.")
 
     client = Client(
-        "web_login", api_id=API_ID, api_hash=API_HASH, session_string=session, in_memory=True
+        "web_login", api_id=API_ID, api_hash=API_HASH, session_string=session,
+        in_memory=True, **tg.SESSION_DEVICE
     )
     try:
         authorized = await client.connect()
