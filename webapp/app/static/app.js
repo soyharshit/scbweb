@@ -128,6 +128,7 @@ async function boot() {
     state.me = { logged_in: false };
   }
   $("bootSkeleton").classList.add("hidden");
+  renderEnterHint();
   state.me.logged_in ? showApp() : showLogin();
   if (state.me.logged_in) {
     api("/api/visit", { method: "POST" }).catch(() => {});   // dashboard visit stat
@@ -277,6 +278,14 @@ function updateLinkHints() {
   }
 }
 
+// the link field hint: touch devices have no Ctrl+Enter, so keep it simple there
+function renderEnterHint() {
+  const el = $("enterHint");
+  if (!el) return;
+  const coarse = !!(window.matchMedia && window.matchMedia("(pointer: coarse)").matches);
+  el.textContent = t(coarse ? "link.enter_hint_mobile" : "link.enter_hint");
+}
+
 // grow the link field to fit pasted multi-line content
 function autoGrow() {
   const el = $("linkInput");
@@ -288,6 +297,7 @@ function autoGrow() {
 // re-render everything after a language change
 function rerender() {
   renderQuota();
+  renderEnterHint();
   renderList();
   const sel = state.jobs.find((j) => j.id === state.selected);
   if (sel) renderJob(sel);
