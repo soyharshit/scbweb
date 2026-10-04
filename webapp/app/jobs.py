@@ -363,6 +363,12 @@ def extract_link(text: str | None) -> str | None:
 
 
 def parse_link(raw_link: str) -> dict:
+    """Split a Telegram message link into the chat to read and the message id.
+
+    Any query string is dropped on purpose: Telegram stamps "?single" on every
+    link you copy for one item of an album, and this site always saves the
+    whole album rather than the one item the link happened to point at.
+    """
     link = raw_link.strip().replace("telegram.me/", "t.me/")
     if "t.me/+" in link or "t.me/joinchat/" in link or "/joinchat/" in link:
         return {"kind": "invite", "link": link}
@@ -388,13 +394,12 @@ def parse_link(raw_link: str) -> dict:
                 chat_ids.append(int("-100" + raw_id))
                 chat_ids.append(int(raw_id))
             chat_ids.append(raw_id)
-            return {"kind": "message", "chat_ids": chat_ids, "msg_id": msg_id,
-                    "single": "?single" in link}
+            return {"kind": "message", "chat_ids": chat_ids, "msg_id": msg_id}
 
         if "t.me/b/" in link:
             parts = link.split("/")
             return {"kind": "message", "chat_ids": [int(parts[-2])],
-                    "msg_id": int(parts[-1].split("?")[0]), "single": "?single" in link}
+                    "msg_id": int(parts[-1].split("?")[0])}
 
         if "t.me/" in link:
             parts = link.split("/")
@@ -403,8 +408,7 @@ def parse_link(raw_link: str) -> dict:
             else:
                 chat_ids = [parts[-2]]
             msg_id = int(parts[-1].split("?")[0])
-            return {"kind": "message", "chat_ids": chat_ids, "msg_id": msg_id,
-                    "single": "?single" in link}
+            return {"kind": "message", "chat_ids": chat_ids, "msg_id": msg_id}
     except JobError:
         raise
     except (ValueError, IndexError):
@@ -1204,10 +1208,13 @@ def _no_content_error() -> JobError:
     )
 
 
-async def _save_msg(userbot, job: Job, msg, parsed: dict):
-    """Forward one resolved message (and its album) to Saved Messages."""
+async def _save_msg(userbot, job: Job, msg):
+    """Forward one resolved message (and its whole album) to Saved Messages."""
     msgs = [msg]
-    if msg.media_group_id and not parsed.get("single"):
+    # Telegram stamps "?single" on every link you copy for one item of an
+    # album, so honoring it would make a pasted album link land just one
+    # file. An album is one post, so all of it is saved.
+    if msg.media_group_id:
         try:
             group = await _call(job, "get_media_group",
                                 lambda: userbot.get_media_group(msg.chat.id, msg.id))
@@ -1246,7 +1253,7 @@ async def _run_single(userbot, job: Job) -> None:
                         f"You've used all {DAILY_LIMIT} daily saves.")
 
     msg = await _resolve_message(userbot, job, parsed)
-    saved_ids, items, note, msgs = await _save_msg(userbot, job, msg, parsed)
+    saved_ids, items, note, msgs = await _save_msg(userbot, job, msg)
 
     text = _text_content(msg)
     if text:
@@ -1396,7 +1403,7 @@ async def _run_multi(userbot, job: Job) -> None:
             if parsed["kind"] != "message":
                 raise JobError("Multi-link saves need message links (https://t.me/...).")
             msg = await _resolve_message(userbot, job, parsed)
-            saved_ids, items, note, _msgs = await _save_msg(userbot, job, msg, parsed)
+            saved_ids, items, note, _msgs = await _save_msg(userbot, job, msg)
         except FloodBudgetExceeded:
             raise        # rate limited: stop the whole run instead of hammering
         except JobError as exc:
