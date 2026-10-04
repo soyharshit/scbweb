@@ -443,26 +443,63 @@ def _downloadable(msg) -> bool:
     )
 
 
+_MSG_FETCH = (
+    "Could not fetch the message. Please check the link and make sure you have access to it."
+)
+_MSG_NOT_JOINED = (
+    "You haven't joined this chat or you don't have access to it.\n"
+    "Please join the chat first, then try again."
+)
+_MSG_EMPTY = (
+    "This message is empty or has been deleted.\n"
+    "The link may be invalid, or your session may lack access to this chat."
+)
+_MSG_SERVICE = "This is a service message with nothing to save."
+_MSG_NO_CONTENT = (
+    "Message has no savable content.\n"
+    "Supported: text, photos, videos, documents, audio, voice, stickers, animations, polls."
+)
+# Telegram's ids for "@username nobody owns": a link built on one of these can
+# never resolve, so say what is wrong instead of blaming the user's access.
+_DEAD_USERNAMES = {"USERNAME_NOT_OCCUPIED", "USERNAME_INVALID"}
+
+
+def _rpc_id(exc: BaseException) -> str:
+    """Telegram's error id for an exception, or "" when it carries none."""
+    return getattr(type(exc), "ID", "") or ""
+
+
 async def _resolve_message(userbot, job: Job, parsed: dict, require_content: bool = True):
     msg_id = parsed["msg_id"]
     chat_ids = list(parsed["chat_ids"])
+    usernames = [c for c in chat_ids
+                 if isinstance(c, str) and not c.lstrip("-").isdigit()]
 
     job.step = "Finding the message..."
     job.touch()
 
-    for username in [c for c in chat_ids if isinstance(c, str) and not c.lstrip("-").isdigit()]:
+    # Turn every @username into a chat id, and remember the ones Telegram says
+    # nobody owns so a dead link can be reported for what it really is.
+    dead: set[str] = set()
+    for username in usernames:
         try:
-            resolved = await userbot.get_chat(username)
+            resolved = await _call(job, "get_chat",
+                                   lambda u=username: userbot.get_chat(u))
             rid = getattr(resolved, "id", None)
             if rid and rid not in chat_ids:
                 chat_ids.append(rid)
-        except Exception:
-            pass
+        except JobError:
+            raise
+        except Exception as exc:
+            log.info("get_chat(%s) refused while resolving %s (%s): %s",
+                     username, job.link, type(exc).__name__, exc)
+            if _rpc_id(exc) in _DEAD_USERNAMES:
+                dead.add(username)
 
     # For private-format links (t.me/c/, t.me/b/) the user must have the chat
     # in their dialogs, otherwise there is nothing to try. For public username
     # links we don't block upfront -- Telegram may serve the message anyway;
-    # if it can't be fetched we fall back to the "join first" hint below.
+    # when it can't be read we join the chat by its username, like an invite.
     not_in_dialogs = False
     needs_dialogs = "t.me/c/" in job.link or "t.me/b/" in job.link or any(
         isinstance(c, str) and not c.lstrip("-").isdigit() for c in chat_ids
@@ -473,80 +510,144 @@ async def _resolve_message(userbot, job: Job, parsed: dict, require_content: boo
             int_ids = [cid for cid in chat_ids if isinstance(cid, int)]
             if int_ids and not any(cid in known or abs(cid) in known for cid in int_ids):
                 if "t.me/c/" in job.link or "t.me/b/" in job.link:
-                    raise JobError(
-                        "You haven't joined this chat or you don't have access to it.\n"
-                        "Please join the chat first, then try again."
-                    )
+                    raise JobError(_MSG_NOT_JOINED)
                 not_in_dialogs = True
         except JobError:
             raise
         except Exception:
             pass
 
-    join_hint = (
-        "You haven't joined this chat or you don't have access to it.\n"
-        "Please join the chat first, then try again."
-    )
+    async def _attempt():
+        """One read of every candidate chat.
 
-    msg = None
-    for cid in chat_ids:
-        try:
-            candidate = await _call(job, "get_messages",
-                                   lambda cid=cid: userbot.get_messages(cid, msg_id))
+        Returns (usable message, blank message, refusals): the first is a
+        message we can save, the second is one Telegram answered with but
+        that holds nothing savable, the third lists every call that was
+        refused, so the log can say why nothing came back.
+        """
+        blank = None
+        refusals: list = []
+
+        for cid in chat_ids:
+            try:
+                candidate = await _call(job, "get_messages",
+                                        lambda cid=cid: userbot.get_messages(cid, msg_id))
+            except JobError:
+                raise
+            except Exception as exc:
+                refusals.append((f"get_messages({cid})", exc))
+                continue
+            if candidate is None:
+                continue
             if _has_content(candidate):
-                msg = candidate
-                break
-        except Exception:
-            continue
+                return candidate, blank, refusals
+            if blank is None:
+                blank = candidate
 
-    if not msg:
         for cid in chat_ids:
             if not isinstance(cid, int):
                 continue
             try:
                 async for m in userbot.get_chat_history(cid, limit=1, offset_id=msg_id + 1):
-                    if m.id == msg_id and _has_content(m):
-                        msg = m
-                        break
-                if msg:
+                    if m.id != msg_id:
+                        continue
+                    if _has_content(m):
+                        return m, blank, refusals
+                    if blank is None:
+                        blank = m
                     break
-            except Exception:
-                continue
+            except JobError:
+                raise
+            except Exception as exc:
+                refusals.append((f"get_chat_history({cid})", exc))
 
-    if not msg:
-        try:
-            raw_id = str(job.link.split("/")[-2]).lstrip("-100")
-            known = await _cached_dialogs(userbot, job.uid)
-            for cid in known:
-                if raw_id in str(abs(cid)):
+        if blank is None:
+            try:
+                raw_id = str(job.link.split("/")[-2]).lstrip("-100")
+                known = await _cached_dialogs(userbot, job.uid)
+                for cid in known:
+                    if raw_id not in str(abs(cid)):
+                        continue
                     candidate = await _call(job, "get_messages",
-                                           lambda cid=cid: userbot.get_messages(cid, msg_id))
+                                            lambda cid=cid: userbot.get_messages(cid, msg_id))
                     if _has_content(candidate):
-                        msg = candidate
-                        break
-        except Exception:
-            pass
+                        return candidate, blank, refusals
+                    if blank is None:
+                        blank = candidate
+                    break
+            except JobError:
+                raise
+            except Exception as exc:
+                refusals.append(("dialog scan", exc))
+
+        return None, blank, refusals
+
+    def _note(refusals, when: str) -> None:
+        for what, exc in refusals:
+            log.info("%s refused while resolving %s%s (%s): %s",
+                     what, job.link, when, type(exc).__name__, exc)
+
+    msg, blank, refusals = await _attempt()
+    _note(refusals, "")
+
+    # A public chat can be joined through its @username, exactly like an
+    # invite link: when Telegram refuses to answer at all and the account is
+    # not in that chat yet, join it and read the message again. When Telegram
+    # does answer (the id is simply wrong or empty) joining would not help,
+    # so the "join first" hint stays the better advice there.
+    live = [u for u in usernames if u not in dead]
+    already_in = any(isinstance(c, int) for c in chat_ids)
+    if msg is None and blank is None and live and (not_in_dialogs or not already_in):
+        joined = False
+        for username in live:
+            job.step = "Joining channel..."
+            job.touch()
+            try:
+                await _call(job, "join_chat", lambda u=username: userbot.join_chat(u))
+                joined = True
+            except JobError:
+                raise
+            except Exception as exc:
+                log.info("auto-join of %s refused for %s (%s): %s",
+                         username, job.link, type(exc).__name__, exc)
+                joined = joined or _rpc_id(exc) == "USER_ALREADY_PARTICIPANT"
+        if joined:
+            not_in_dialogs = False
+            _DIALOG_CACHE.pop(f"ub_{job.uid}", None)
+            job.step = "Finding the message..."
+            job.touch()
+            msg, blank, refusals = await _attempt()
+            _note(refusals, " after the join")
 
     if not msg:
-        raise JobError(
-            join_hint if not_in_dialogs else
-            "Could not fetch the message. Please check the link and make sure you have access to it."
-        )
+        if usernames and all(u in dead for u in usernames):
+            # the link is built on a username Telegram has never heard of
+            raise JobError(
+                f"This Telegram username @{usernames[0].lstrip('@')} doesn't exist. "
+                "Please check the link."
+            )
+        if not_in_dialogs:
+            raise JobError(_MSG_NOT_JOINED)
+        if blank is not None:
+            # Telegram did answer: the message is there, it just has nothing
+            # to save, which is a very different problem from not finding it
+            if getattr(blank, "empty", False):
+                raise JobError(_MSG_EMPTY)
+            if getattr(blank, "service", None):
+                raise JobError(_MSG_SERVICE)
+            if require_content:
+                raise JobError(_MSG_NO_CONTENT)
+            return blank
+        raise JobError(_MSG_FETCH)
 
     if getattr(msg, "empty", False):
-        raise JobError(
-            "This message is empty or has been deleted.\n"
-            "The link may be invalid, or your session may lack access to this chat."
-        )
+        raise JobError(_MSG_EMPTY)
 
     if msg.service:
-        raise JobError("This is a service message with nothing to save.")
+        raise JobError(_MSG_SERVICE)
 
     if require_content and not _has_content(msg):
-        raise JobError(
-            "Message has no savable content.\n"
-            "Supported: text, photos, videos, documents, audio, voice, stickers, animations, polls."
-        )
+        raise JobError(_MSG_NO_CONTENT)
 
     return msg
 
@@ -893,19 +994,31 @@ async def _store_to_saved(userbot, job: Job, msgs: list) -> tuple[list[int], str
         try:  # cheapest: a plain forward keeps the original formatting
             ids = _ids(await _call(job, "forward",
                                    lambda: userbot.forward_messages("me", m.chat.id, [m.id])))
+            if not ids:
+                log.info("forward of message %s returned nothing (chat=%s)",
+                         m.id, getattr(getattr(m, "chat", None), "id", None))
         except FloodBudgetExceeded:
             raise        # the account must cool down; no point trying the rest
-        except Exception:
+        except Exception as exc:
+            log.info("forward refused for message %s (%s): %s",
+                     m.id, type(exc).__name__, exc)
             ids = []
         if not ids:
             try:  # copy behaves the same but leaves no "forwarded from" header
                 ids = _ids(await _call(job, "copy",
                                        lambda: userbot.copy_message("me", m.chat.id, m.id)))
+                if not ids:
+                    log.info("copy of message %s returned nothing (chat=%s)",
+                             m.id, getattr(getattr(m, "chat", None), "id", None))
             except FloodBudgetExceeded:
                 raise
-            except Exception:
+            except Exception as exc:
+                log.info("copy refused for message %s (%s): %s",
+                         m.id, type(exc).__name__, exc)
                 ids = []
         if not ids:
+            log.info("falling back to download and re-upload for message %s (chat=%s)",
+                     m.id, getattr(getattr(m, "chat", None), "id", None))
             ids, big, parts = await _fallback_save(userbot, job, m, i, count, job_dir)
             oversized = oversized or big
             if parts:

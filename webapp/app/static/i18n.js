@@ -92,6 +92,7 @@ const I18N = {
     "err.cooldown": "Please wait {1}m {2}s before saving again.",
     "err.busy": "Another save is already in progress. Please wait for it to finish.",
     "err.fetch": "Could not fetch the message. Please check the link and make sure you have access to it.",
+    "err.username": "This Telegram username @{1} doesn't exist. Please check the link.",
     "err.not_joined": "You haven't joined this chat or you don't have access to it.\nPlease join the chat first, then try again.",
     "err.empty": "This message is empty or has been deleted.\nThe link may be invalid, or your session may lack access to this chat.",
     "err.service": "This is a service message with nothing to save.",
@@ -333,6 +334,7 @@ const I18N = {
     "err.cooldown": "Espera {1} min {2} s antes de guardar de nuevo.",
     "err.busy": "Ya hay otro guardado en curso. Espera a que termine.",
     "err.fetch": "No se pudo obtener el mensaje. Comprueba el enlace y que tengas acceso.",
+    "err.username": "Este nombre de usuario de Telegram @{1} no existe. Comprueba el enlace.",
     "err.not_joined": "No te has unido a este chat o no tienes acceso a él.\nÚnete al chat primero y vuelve a intentarlo.",
     "err.empty": "Este mensaje está vacío o fue eliminado.\nEl enlace puede ser inválido, o tu sesión no tiene acceso a este chat.",
     "err.service": "Es un mensaje de servicio sin contenido para guardar.",
@@ -574,6 +576,7 @@ const I18N = {
     "err.cooldown": "Attendez {1} min {2} s avant d'enregistrer à nouveau.",
     "err.busy": "Une autre sauvegarde est en cours. Attendez qu'elle se termine.",
     "err.fetch": "Impossible de récupérer le message. Vérifiez le lien et votre accès.",
+    "err.username": "Ce nom d'utilisateur Telegram @{1} n'existe pas. Vérifiez le lien.",
     "err.not_joined": "Vous n'avez pas rejoint cette discussion ou vous n'y avez pas accès.\nRejoignez la discussion d'abord, puis réessayez.",
     "err.empty": "Ce message est vide ou a été supprimé.\nLe lien est peut-être invalide, ou votre session n'a pas accès à cette discussion.",
     "err.service": "Ceci est un message de service, rien à enregistrer.",
@@ -815,6 +818,7 @@ const I18N = {
     "err.cooldown": "انتظر {1} د {2} ث قبل الحفظ مجدداً.",
     "err.busy": "يوجد حفظ آخر قيد التنفيذ. انتظر انتهائه.",
     "err.fetch": "تعذّر جلب الرسالة. تحقق من الرابط وصلاحيتك للوصول.",
+    "err.username": "اسم مستخدم تيليجرام @{1} غير موجود. تحقق من الرابط.",
     "err.not_joined": "لم تنضم إلى هذه المحادثة أو لا تملك صلاحية الوصول إليها.\nانضم إلى المحادثة أولاً ثم أعد المحاولة.",
     "err.empty": "الرسالة فارغة أو تم حذفها.\nقد يكون الرابط غير صالح، أو لا تملك جلستك صلاحية الوصول إلى هذه المحادثة.",
     "err.service": "هذه رسالة خدمة لا يوجد فيها ما يمكن حفظه.",
@@ -1056,6 +1060,7 @@ const I18N = {
     "err.cooldown": "Подождите {1} мин {2} сек, прежде чем сохранять снова.",
     "err.busy": "Другое сохранение уже выполняется. Дождитесь его завершения.",
     "err.fetch": "Не удалось получить сообщение. Проверьте ссылку и доступ к чату.",
+    "err.username": "Пользователь Telegram @{1} не существует. Проверьте ссылку.",
     "err.not_joined": "Вы не вступили в этот чат или у вас нет к нему доступа.\nСначала вступите в чат и попробуйте снова.",
     "err.empty": "Сообщение пустое или удалено.\nСсылка может быть неверной, или у вашей сессии нет доступа к этому чату.",
     "err.service": "Это служебное сообщение, сохранять нечего.",
@@ -1297,6 +1302,7 @@ const I18N = {
     "err.cooldown": "请等待 {1} 分 {2} 秒后再保存。",
     "err.busy": "已有另一个保存任务在进行，请等待完成。",
     "err.fetch": "无法获取消息，请检查链接并确认你有访问权限。",
+    "err.username": "Telegram 用户名 @{1} 不存在。请检查链接。",
     "err.not_joined": "你还没有加入该聊天或没有访问权限。\n请先加入聊天后重试。",
     "err.empty": "该消息为空或已被删除。\n链接可能无效，或你的会话没有该聊天的访问权限。",
     "err.service": "这是服务消息，没有可保存的内容。",
@@ -1538,6 +1544,7 @@ const I18N = {
     "err.cooldown": "Espere {1} min {2} s antes de salvar de novo.",
     "err.busy": "Outro salvamento já está em andamento. Aguarde ele terminar.",
     "err.fetch": "Não foi possível buscar a mensagem. Verifique o link e se você tem acesso.",
+    "err.username": "Este nome de usuário do Telegram @{1} não existe. Verifique o link.",
     "err.not_joined": "Você não entrou neste chat ou não tem acesso a ele.\nEntre no chat primeiro e tente novamente.",
     "err.empty": "Esta mensagem está vazia ou foi apagada.\nO link pode ser inválido, ou sua sessão não tem acesso a este chat.",
     "err.service": "Esta é uma mensagem de serviço, nada para salvar.",
@@ -1779,6 +1786,7 @@ const I18N = {
     "err.cooldown": "Tunggu {1} mnt {2} dtk sebelum menyimpan lagi.",
     "err.busy": "Penyimpanan lain sedang berjalan. Tunggu hingga selesai.",
     "err.fetch": "Gagal mengambil pesan. Periksa tautan dan apakah Anda punya akses.",
+    "err.username": "Nama pengguna Telegram @{1} tidak ada. Periksa tautannya.",
     "err.not_joined": "Anda belum bergabung ke obrolan ini atau tidak punya akses.\nGabung dulu ke obrolan lalu coba lagi.",
     "err.empty": "Pesan ini kosong atau sudah dihapus.\nTautan mungkin tidak valid, atau sesi Anda tidak punya akses ke obrolan ini.",
     "err.service": "Ini pesan layanan, tidak ada yang bisa disimpan.",
@@ -2032,7 +2040,8 @@ const SERVER_PATTERNS = [
   [/^Split into (\d+) parts; join them in order to restore the original file\.$/, "srv.split_n"],
   [/^Split into parts; join each set of parts in order to restore the original file\.$/, "srv.split_many"],
   [/^Rate limited by Telegram\. Try again in about (\d+) minutes\.$/, "err.flood_m"],
-  [/^The number of days must be between 1 and (\d+)\.$/, "err.days"]
+  [/^The number of days must be between 1 and (\d+)\.$/, "err.days"],
+  [/^This Telegram username @(\S+) doesn't exist\. Please check the link\.$/, "err.username"]
 ];
 
 /* -------------------------------------------------------------------------
