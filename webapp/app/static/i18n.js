@@ -227,7 +227,23 @@ const I18N = {
     "step.stopped": "Stopped",
     "step.resuming": "Resuming...",
     "step.flood_wait": "Rate limited by Telegram, waiting {1}s",
-    "err.job_finished": "This job has already finished."
+    "err.job_finished": "This job has already finished.",
+    "quota.unlimited": "Unlimited saves",
+    "quota.days_left": "{n}d left",
+    "step.uploading_part": "Uploading part {1}/{2} to Saved Messages",
+    "step.retry": "Retrying in {1}s...",
+    "srv.split_n": "Split into {1} parts; join them in order to restore the original file.",
+    "srv.split_many": "Split into parts; join each set of parts in order to restore the original file.",
+    "err.flood_m": "Rate limited by Telegram. Try again in about {1} minutes.",
+    "err.days": "The number of days must be between 1 and {1}.",
+    "admin.unlimited": "Unlimited",
+    "admin.unlimited_remove": "Remove",
+    "admin.unlimited_days": "Days",
+    "admin.unlimited_give": "Give",
+    "admin.unlimited_note": "The days count from now.",
+    "admin.days_needed": "Enter how many days.",
+    "admin.toast_unlimited": "Unlimited quota activated.",
+    "admin.toast_unlimited_cleared": "Unlimited quota removed."
   },
 
   es: {
@@ -452,7 +468,23 @@ const I18N = {
     "step.stopped": "Detenido",
     "step.resuming": "Reanudando...",
     "step.flood_wait": "Limitado por Telegram, esperando {1} s",
-    "err.job_finished": "Este trabajo ya ha terminado."
+    "err.job_finished": "Este trabajo ya ha terminado.",
+    "quota.unlimited": "Guardados ilimitados",
+    "quota.days_left": "quedan {n}d",
+    "step.uploading_part": "Subiendo la parte {1}/{2} a Mensajes guardados",
+    "step.retry": "Reintentando en {1}s...",
+    "srv.split_n": "Dividido en {1} partes; únelas en orden para restaurar el archivo original.",
+    "srv.split_many": "Dividido en partes; une cada conjunto en orden para restaurar el archivo original.",
+    "err.flood_m": "Telegram limitó la frecuencia. Inténtalo en unos {1} minutos.",
+    "err.days": "El número de días debe estar entre 1 y {1}.",
+    "admin.unlimited": "Ilimitado",
+    "admin.unlimited_remove": "Quitar",
+    "admin.unlimited_days": "Días",
+    "admin.unlimited_give": "Aplicar",
+    "admin.unlimited_note": "Los días cuentan desde ahora.",
+    "admin.days_needed": "Indica cuántos días.",
+    "admin.toast_unlimited": "Cuota ilimitada activada.",
+    "admin.toast_unlimited_cleared": "Cuota ilimitada retirada."
   },
 
   fr: {
@@ -677,7 +709,23 @@ const I18N = {
     "step.stopped": "Arrêté",
     "step.resuming": "Reprise...",
     "step.flood_wait": "Limité par Telegram, attente de {1} s",
-    "err.job_finished": "Cette tâche est déjà terminée."
+    "err.job_finished": "Cette tâche est déjà terminée.",
+    "quota.unlimited": "Sauvegardes illimitées",
+    "quota.days_left": "{n}j restants",
+    "step.uploading_part": "Envoi de la partie {1}/{2} vers les Messages enregistrés",
+    "step.retry": "Nouvelle tentative dans {1}s...",
+    "srv.split_n": "Découpé en {1} parties; assemblez-les dans l'ordre pour reconstituer le fichier d'origine.",
+    "srv.split_many": "Découpé en parties; assemblez chaque série dans l'ordre pour reconstituer le fichier d'origine.",
+    "err.flood_m": "Limité par Telegram. Réessayez dans environ {1} minutes.",
+    "err.days": "Le nombre de jours doit être compris entre 1 et {1}.",
+    "admin.unlimited": "Illimité",
+    "admin.unlimited_remove": "Retirer",
+    "admin.unlimited_days": "Jours",
+    "admin.unlimited_give": "Appliquer",
+    "admin.unlimited_note": "Les jours comptent à partir de maintenant.",
+    "admin.days_needed": "Indiquez le nombre de jours.",
+    "admin.toast_unlimited": "Quota illimité activé.",
+    "admin.toast_unlimited_cleared": "Quota illimité retiré."
   },
 
   ar: {
@@ -902,7 +950,23 @@ const I18N = {
     "step.stopped": "متوقف",
     "step.resuming": "جارٍ الاستئناف...",
     "step.flood_wait": "تم تحديدك من تيليجرام، انتظار {1} ث",
-    "err.job_finished": "هذه المهمة قد انتهت بالفعل."
+    "err.job_finished": "هذه المهمة قد انتهت بالفعل.",
+    "quota.unlimited": "حفظ غير محدود",
+    "quota.days_left": "باقي {n} يوم",
+    "step.uploading_part": "جارٍ رفع الجزء {1}/{2} إلى رسائلك المحفوظة",
+    "step.retry": "إعادة المحاولة خلال {1} ث...",
+    "srv.split_n": "تم تقسيمه إلى {1} أجزاء؛ اجمعها بالترتيب لاستعادة الملف الأصلي.",
+    "srv.split_many": "تم تقسيمه إلى أجزاء؛ اجمع كل مجموعة بالترتيب لاستعادة الملف الأصلي.",
+    "err.flood_m": "تم تقييدك من تيليجرام. أعد المحاولة بعد حوالي {1} دقيقة.",
+    "err.days": "يجب أن يكون عدد الأيام بين 1 و{1}.",
+    "admin.unlimited": "غير محدود",
+    "admin.unlimited_remove": "إزالة",
+    "admin.unlimited_days": "أيام",
+    "admin.unlimited_give": "تفعيل",
+    "admin.unlimited_note": "تبدأ الأيام من الآن.",
+    "admin.days_needed": "أدخل عدد الأيام.",
+    "admin.toast_unlimited": "تم تفعيل الحصة غير المحدودة.",
+    "admin.toast_unlimited_cleared": "تمت إزالة الحصة غير المحدودة."
   },
 
   ru: {
@@ -1127,7 +1191,23 @@ const I18N = {
     "step.stopped": "Остановлено",
     "step.resuming": "Продолжаем...",
     "step.flood_wait": "Ограничение Telegram, ожидание {1} с",
-    "err.job_finished": "Эта задача уже завершена."
+    "err.job_finished": "Эта задача уже завершена.",
+    "quota.unlimited": "Безлимитные сохранения",
+    "quota.days_left": "осталось {n} дн.",
+    "step.uploading_part": "Загрузка части {1}/{2} в Избранное",
+    "step.retry": "Повтор через {1} с...",
+    "srv.split_n": "Разделено на {1} частей; соберите части по порядку, чтобы восстановить исходный файл.",
+    "srv.split_many": "Разделено на части; соберите каждую группу по порядку, чтобы восстановить исходный файл.",
+    "err.flood_m": "Ограничение Telegram. Попробуйте примерно через {1} мин.",
+    "err.days": "Количество дней должно быть от 1 до {1}.",
+    "admin.unlimited": "Безлимит",
+    "admin.unlimited_remove": "Убрать",
+    "admin.unlimited_days": "Дней",
+    "admin.unlimited_give": "Выдать",
+    "admin.unlimited_note": "Дни считаются с этого момента.",
+    "admin.days_needed": "Укажите количество дней.",
+    "admin.toast_unlimited": "Безлимит включён.",
+    "admin.toast_unlimited_cleared": "Безлимит отключён."
   },
 
   zh: {
@@ -1352,7 +1432,23 @@ const I18N = {
     "step.stopped": "已停止",
     "step.resuming": "继续处理...",
     "step.flood_wait": "被 Telegram 限流，等待 {1} 秒",
-    "err.job_finished": "该任务已完成。"
+    "err.job_finished": "该任务已完成。",
+    "quota.unlimited": "不限次数保存",
+    "quota.days_left": "剩余 {n} 天",
+    "step.uploading_part": "正在上传第 {1}/{2} 部分到收藏夹",
+    "step.retry": "{1} 秒后重试...",
+    "srv.split_n": "已拆分为 {1} 部分；按顺序合并即可还原原文件。",
+    "srv.split_many": "已拆分为多个部分；按顺序合并每组部分即可还原原文件。",
+    "err.flood_m": "被 Telegram 限流，请在约 {1} 分钟后重试。",
+    "err.days": "天数必须在 1 到 {1} 之间。",
+    "admin.unlimited": "不限",
+    "admin.unlimited_remove": "取消",
+    "admin.unlimited_days": "天数",
+    "admin.unlimited_give": "启用",
+    "admin.unlimited_note": "天数从现在开始计算。",
+    "admin.days_needed": "请输入天数。",
+    "admin.toast_unlimited": "已启用不限额度。",
+    "admin.toast_unlimited_cleared": "已取消不限额度。"
   },
 
   pt: {
@@ -1577,7 +1673,23 @@ const I18N = {
     "step.stopped": "Parado",
     "step.resuming": "Retomando...",
     "step.flood_wait": "Limitado pelo Telegram, aguardando {1}s",
-    "err.job_finished": "Este trabalho já foi concluído."
+    "err.job_finished": "Este trabalho já foi concluído.",
+    "quota.unlimited": "Salvamentos ilimitados",
+    "quota.days_left": "{n}d restantes",
+    "step.uploading_part": "Enviando a parte {1}/{2} para as Mensagens salvas",
+    "step.retry": "Tentando novamente em {1}s...",
+    "srv.split_n": "Dividido em {1} partes; junte as partes em ordem para restaurar o arquivo original.",
+    "srv.split_many": "Dividido em partes; junte cada conjunto em ordem para restaurar o arquivo original.",
+    "err.flood_m": "Limite do Telegram atingido. Tente novamente em cerca de {1} minutos.",
+    "err.days": "O número de dias deve estar entre 1 e {1}.",
+    "admin.unlimited": "Ilimitado",
+    "admin.unlimited_remove": "Remover",
+    "admin.unlimited_days": "Dias",
+    "admin.unlimited_give": "Aplicar",
+    "admin.unlimited_note": "Os dias contam a partir de agora.",
+    "admin.days_needed": "Informe quantos dias.",
+    "admin.toast_unlimited": "Cota ilimitada ativada.",
+    "admin.toast_unlimited_cleared": "Cota ilimitada removida."
   },
 
   id: {
@@ -1802,7 +1914,23 @@ const I18N = {
     "step.stopped": "Dihentikan",
     "step.resuming": "Melanjutkan...",
     "step.flood_wait": "Dibatasi Telegram, menunggu {1} d",
-    "err.job_finished": "Pekerjaan ini sudah selesai."
+    "err.job_finished": "Pekerjaan ini sudah selesai.",
+    "quota.unlimited": "Simpan tanpa batas",
+    "quota.days_left": "{n}h tersisa",
+    "step.uploading_part": "Mengunggah bagian {1}/{2} ke Pesan Tersimpan",
+    "step.retry": "Mencoba lagi dalam {1} dtk...",
+    "srv.split_n": "Dipotong menjadi {1} bagian; gabungkan bagian secara berurutan untuk memulihkan file asli.",
+    "srv.split_many": "Dipotong menjadi beberapa bagian; gabungkan setiap bagian secara berurutan untuk memulihkan file asli.",
+    "err.flood_m": "Dibatasi oleh Telegram. Coba lagi dalam sekitar {1} menit.",
+    "err.days": "Jumlah hari harus antara 1 dan {1}.",
+    "admin.unlimited": "Tanpa batas",
+    "admin.unlimited_remove": "Hapus",
+    "admin.unlimited_days": "Hari",
+    "admin.unlimited_give": "Aktifkan",
+    "admin.unlimited_note": "Hitungan hari dimulai sekarang.",
+    "admin.days_needed": "Masukkan jumlah hari.",
+    "admin.toast_unlimited": "Kuota tanpa batas diaktifkan.",
+    "admin.toast_unlimited_cleared": "Kuota tanpa batas dihapus."
   }
 };
 
@@ -1824,6 +1952,7 @@ const SERVER_EXACT = {
   "Saved to your Saved Messages.": "srv.saved",
   "Joined the channel successfully.": "srv.joined",
   "One or more files exceed the 2 GB limit for non-Premium accounts. Upgrade to Telegram Premium to save larger files.": "srv.oversize",
+  "Split into parts; join each set of parts in order to restore the original file.": "srv.split_many",
   "Please paste a Telegram message link (https://t.me/...).": "err.paste_link",
   "Only Telegram links are supported (t.me/...).": "err.only_tg",
   "Your account has been banned.": "ban.banner",
@@ -1897,7 +2026,13 @@ const SERVER_PATTERNS = [
   [/^Line (\d+) is not a valid Telegram link\.$/, "err.line"],
   [/^Finding files (\d+)\/(\d+)\.\.\.$/, "step.finding_n"],
   [/^Saving link (\d+)\/(\d+)\.\.\.$/, "step.link_n"],
-  [/^Rate limited by Telegram, waiting (\d+)s$/, "step.flood_wait"]
+  [/^Rate limited by Telegram, waiting (\d+)s$/, "step.flood_wait"],
+  [/^Uploading part (\d+)\/(\d+) to Saved Messages$/, "step.uploading_part"],
+  [/^Retrying in (\d+)s\.\.\.$/, "step.retry"],
+  [/^Split into (\d+) parts; join them in order to restore the original file\.$/, "srv.split_n"],
+  [/^Split into parts; join each set of parts in order to restore the original file\.$/, "srv.split_many"],
+  [/^Rate limited by Telegram\. Try again in about (\d+) minutes\.$/, "err.flood_m"],
+  [/^The number of days must be between 1 and (\d+)\.$/, "err.days"]
 ];
 
 /* -------------------------------------------------------------------------
@@ -1936,8 +2071,7 @@ function _fill(s, arr) {
   return out;
 }
 
-function translateServer(str) {
-  if (!str || LANG === "en") return str;
+function _translateOne(str) {
   const key = SERVER_EXACT[str];
   if (key) return t(key);
   for (let i = 0; i < SERVER_PATTERNS.length; i++) {
@@ -1948,7 +2082,26 @@ function translateServer(str) {
       return _fill(t(k), m.slice(1));
     }
   }
-  return str;
+  return null;
+}
+
+function translateServer(str) {
+  if (!str || LANG === "en") return str;
+  const direct = _translateOne(str);
+  if (direct !== null) return direct;
+  // a job message stacks a note after its main sentence ("Saved ... . Split
+  // into 3 parts; ..."): translate sentence by sentence so both land
+  if (str.indexOf(". ") < 0) return str;
+  const parts = str.split(". ");
+  let hits = 0;
+  const out = parts.map((part, i) => {
+    const sentence = i < parts.length - 1 ? part + "." : part;
+    const one = _translateOne(sentence);
+    if (one === null) return sentence;
+    hits += 1;
+    return one;
+  });
+  return hits ? out.join(" ") : str;
 }
 
 function applyStaticI18n(root) {

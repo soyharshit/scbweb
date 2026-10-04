@@ -944,14 +944,16 @@ html[dir="rtl"] .switch-row input:checked + .switch::after { transform: translat
 .user-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
 .user-row {
   display: flex;
-  align-items: center;
-  gap: 10px;
+  flex-direction: column;
+  gap: 8px;
   background: var(--field);
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
   padding: 10px 12px;
   animation: fadeUp .3s var(--ease) both;
 }
+.user-row-main { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.user-actions { display: flex; align-items: center; gap: 8px; flex: none; }
 .user-info { flex: 1; min-width: 0; }
 .user-name {
   font-size: .87rem;
@@ -962,6 +964,19 @@ html[dir="rtl"] .switch-row input:checked + .switch::after { transform: translat
 }
 .user-meta { font-size: .74rem; color: var(--muted-fg); margin-top: 2px; overflow-wrap: anywhere; }
 .user-row .btn { flex: none; }
+
+/* inline "unlimited quota" grant form inside a user row */
+.user-unlimited {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding-top: 8px;
+  border-top: 1px dashed var(--border);
+}
+.user-unlimited .field-hint { margin: 0; text-align: start; }
+/* beats the global `input[type=number] { width: 100% }` on specificity + order */
+input.days-input { width: 112px; padding: 7px 10px; font-size: .84rem; }
 
 .field-hint.error { color: #dc2626; }
 html[data-theme="dark"] .field-hint.error { color: #f87171; }

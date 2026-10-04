@@ -199,6 +199,11 @@ class BanReq(BaseModel):
     banned: bool
 
 
+class UnlimitedReq(BaseModel):
+    uid: int
+    days: int = 0      # 0 takes the unlimited quota away again
+
+
 class SettingsReq(BaseModel):
     notice: str = Field(default="", max_length=1000)
     notice_login: str = Field(default="", max_length=1000)
@@ -348,6 +353,9 @@ async def me_endpoint(request: Request):
         "Admin" if uid == ADMIN_UID
         else (await db.get_name(uid) or f"User {uid}")
     )
+    now = time.time()
+    until = await db.unlimited_until(uid)
+    unlimited = until > now
     return {
         "logged_in": True,
         "uid": uid,
@@ -356,6 +364,8 @@ async def me_endpoint(request: Request):
         "daily_limit": DAILY_LIMIT,
         "remaining": remaining,
         "reset_at": reset_at,
+        "unlimited": unlimited,
+        "unlimited_days_left": int(-(-(until - now) // 86400)) if unlimited else 0,
         "bulk_limit": BULK_SAVES_PER_DAY,
         "bulk_max_files": BULK_MAX_FILES,
         "bulk_remaining": bulk_remaining,
@@ -562,6 +572,34 @@ async def admin_ban(req: BanReq, request: Request):
             log.exception("could not revoke tokens for %s", req.uid)
         await tg.drop_userbot(req.uid)
     return {"ok": True, "uid": req.uid, "banned": req.banned}
+
+
+UNLIMITED_MAX_DAYS = 3650
+
+
+@app.post("/api/admin/unlimited")
+async def admin_unlimited(req: UnlimitedReq, request: Request):
+    """Open (or take back) a user's daily quota for a number of days.
+
+    The period starts the moment this request lands, so the admin never has
+    to think about when the clock began.
+    """
+    await _require_admin(request)
+    if req.uid == ADMIN_UID:
+        raise _ApiError(400, "The administrator does not need a quota.")
+    if req.days and not 1 <= req.days <= UNLIMITED_MAX_DAYS:
+        raise _ApiError(
+            400,
+            f"The number of days must be between 1 and {UNLIMITED_MAX_DAYS}.",
+        )
+    if req.days:
+        until = await db.set_unlimited(req.uid, req.days)
+        log.warning("Unlimited quota granted to %s for %s day(s)", req.uid, req.days)
+    else:
+        await db.clear_unlimited(req.uid)
+        until = 0
+        log.warning("Unlimited quota removed from %s", req.uid)
+    return {"ok": True, "uid": req.uid, "days": int(req.days), "unlimited_until": until}
 
 
 @app.post("/api/admin/settings")

@@ -161,6 +161,8 @@ class Database:
     async def _quota_remaining(self, uid: int, count_field: str, reset_field: str,
                                limit: int) -> tuple[int, int]:
         """Returns (remaining, reset_at) for one rolling daily counter."""
+        if await self._unlimited_active(uid):
+            return limit, 0     # the admin opened this account's quota
         user = await self._users.find_one({"id": uid})
         if not user:
             return limit, 0
@@ -178,6 +180,8 @@ class Database:
 
     async def _quota_use(self, uid: int, count_field: str, reset_field: str) -> None:
         """Consume one unit of a rolling daily counter (24h window)."""
+        if await self._unlimited_active(uid):
+            return              # saves made inside the unlimited window are free
         now = time.time()
         await self.add_user(uid)
         user = await self._users.find_one({"id": uid}) or {}
@@ -218,6 +222,32 @@ class Database:
 
     async def increment_multi_count(self, uid: int) -> None:
         await self._quota_use(uid, "multi_count", "multi_reset_at")
+
+    # -- unlimited quota granted by the admin -------------------------------
+    async def set_unlimited(self, uid: int, days: int) -> float:
+        """Open every daily counter for `days`, counted from this moment."""
+        now = time.time()
+        until = now + max(1, int(days)) * 86400
+        await self._users.update_one(
+            {"id": uid},
+            {"$set": {"unlimited_until": until, "unlimited_granted_at": now}},
+        )
+        return until
+
+    async def clear_unlimited(self, uid: int) -> None:
+        await self._users.update_one(
+            {"id": uid},
+            {"$unset": {"unlimited_until": "", "unlimited_granted_at": ""}},
+        )
+
+    async def unlimited_until(self, uid: int) -> float:
+        """When a granted period ends; 0 when none is active any more."""
+        user = await self._users.find_one({"id": uid}, {"unlimited_until": 1})
+        until = float((user or {}).get("unlimited_until") or 0)
+        return until if until > time.time() else 0.0
+
+    async def _unlimited_active(self, uid: int) -> bool:
+        return bool(await self.unlimited_until(uid))
 
     # -- web auth tokens -----------------------------------------------------
     @staticmethod
@@ -375,7 +405,8 @@ class Database:
             {},
             {"id": 1, "first_name": 1, "banned": 1, "log": 1, "web_visits": 1,
              "web_last_seen": 1, "daily_download_count": 1,
-             "daily_download_reset_at": 1, "phone": 1, "ip": 1},
+             "daily_download_reset_at": 1, "phone": 1, "ip": 1,
+             "unlimited_until": 1},
         )
         async for u in cursor:
             uid = u.get("id")
@@ -385,6 +416,7 @@ class Database:
                 u.get("daily_download_count", 0)
                 if u.get("daily_download_reset_at", 0) > now else 0
             )
+            unlimited_until = float(u.get("unlimited_until") or 0)
             users.append({
                 "uid": uid,
                 "name": u.get("first_name") or f"User {uid}",
@@ -395,6 +427,7 @@ class Database:
                 "saves_today": int(saves_today),
                 "phone": u.get("phone") or "",
                 "ip": u.get("ip") or "",
+                "unlimited_until": unlimited_until if unlimited_until > now else 0,
             })
         users.sort(key=lambda x: (x["last_seen"], x["visits"]), reverse=True)
 

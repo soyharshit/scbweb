@@ -197,14 +197,22 @@ function renderQuota() {
   const me = state.me || {};
   const pill = $("quota");
   if (me.remaining !== undefined) {
-    let label = t("quota.left", { n: me.remaining, m: me.daily_limit });
+    let label;
+    if (me.unlimited) {
+      label = t("quota.unlimited");
+      if (me.unlimited_days_left > 0) {
+        label += ` · ` + t("quota.days_left", { n: me.unlimited_days_left });
+      }
+    } else {
+      label = t("quota.left", { n: me.remaining, m: me.daily_limit });
+    }
     if (me.cooldown_remaining > 0) {
       const m = Math.floor(me.cooldown_remaining / 60);
       const s = me.cooldown_remaining % 60;
       label += ` · ` + t("quota.ready", { t: `${m ? m + "m " : ""}${s}s` });
     }
     pill.textContent = label;
-    pill.classList.toggle("warn", me.remaining <= 1);
+    pill.classList.toggle("warn", !me.unlimited && me.remaining <= 1);
   }
 
   const sub = $("forceSubBanner");
@@ -263,11 +271,13 @@ function updateLinkHints() {
     const max = me.bulk_max_files || 50;
     const left = me.bulk_remaining;
     let text = t("batch.max", { n: max });
-    if (left !== undefined && left !== null) {
+    if (me.unlimited) {
+      text += " · " + t("quota.unlimited");
+    } else if (left !== undefined && left !== null) {
       text += " · " + (left > 0 ? t("batch.remaining", { n: left }) : t("batch.no_left"));
     }
     bh.textContent = text;
-    bh.classList.toggle("error", left === 0);
+    bh.classList.toggle("error", !me.unlimited && left === 0);
   }
   const mh = $("multiHint");
   if (mh) {
@@ -790,6 +800,9 @@ function renderUsers(users) {
     li.className = "user-row";
     li.style.animationDelay = `${Math.min(i, 10) * 40}ms`;
 
+    const main = document.createElement("div");
+    main.className = "user-row-main";
+
     const info = document.createElement("div");
     info.className = "user-info";
     const name = document.createElement("div");
@@ -803,10 +816,17 @@ function renderUsers(users) {
     if (u.ip) parts.push(escapeHtml(u.ip));
     parts.push(t("admin.meta_visits", { n: u.visits || 0 }));
     if (u.saves_today) parts.push(t("admin.meta_saves", { n: u.saves_today }));
+    if (u.unlimited_until) {
+      parts.push(t("quota.unlimited") + "  ·  " +
+                 t("quota.days_left", { n: unlimitedDaysLeft(u.unlimited_until) }));
+    }
     parts.push(u.last_seen ? timeAgo(u.last_seen) : t("admin.never"));
     if (u.banned) parts.push(t("admin.stat_banned"));
     meta.textContent = parts.join("  ·  ");
     info.append(name, meta);
+
+    const actions = document.createElement("div");
+    actions.className = "user-actions";
 
     const btn = document.createElement("button");
     btn.type = "button";
@@ -814,9 +834,89 @@ function renderUsers(users) {
     btn.textContent = u.banned ? t("admin.unban") : t("admin.ban");
     btn.addEventListener("click", () => toggleBan(u.uid, !u.banned, btn));
 
-    li.append(info, btn);
+    const ubtn = document.createElement("button");
+    ubtn.type = "button";
+    ubtn.className = "btn btn-sm btn-outline";
+    ubtn.textContent = u.unlimited_until ? t("admin.unlimited_remove") : t("admin.unlimited");
+    ubtn.title = t("admin.unlimited_note");
+    ubtn.addEventListener("click", () => {
+      if (u.unlimited_until) { setUnlimited(u.uid, 0, ubtn); return; }
+      form.classList.toggle("hidden");
+      const input = form.querySelector("input");
+      if (!form.classList.contains("hidden") && input) {
+        input.focus();
+        input.select();
+      }
+    });
+
+    actions.append(btn, ubtn);
+    main.append(info, actions);
+
+    // inline grant form: how many days, starting the moment it is sent
+    const form = document.createElement("div");
+    form.className = "user-unlimited hidden";
+
+    const daysLabel = document.createElement("label");
+    daysLabel.className = "field-hint";
+    daysLabel.textContent = t("admin.unlimited_days");
+
+    const input = document.createElement("input");
+    input.type = "number";
+    input.min = "1";
+    input.max = "3650";
+    input.step = "1";
+    input.value = "7";
+    input.inputMode = "numeric";
+    input.className = "days-input";
+    input.setAttribute("aria-label", t("admin.unlimited_days"));
+
+    const give = document.createElement("button");
+    give.type = "button";
+    give.className = "btn btn-sm btn-primary";
+    give.textContent = t("admin.unlimited_give");
+    give.addEventListener("click", () => {
+      const days = parseInt(input.value, 10);
+      if (!days || days < 1) {
+        toast(t("admin.days_needed"), true);
+        input.focus();
+        return;
+      }
+      setUnlimited(u.uid, Math.min(days, 3650), give);
+    });
+
+    const cancel = document.createElement("button");
+    cancel.type = "button";
+    cancel.className = "btn btn-sm btn-ghost";
+    cancel.textContent = t("modal.cancel");
+    cancel.addEventListener("click", () => form.classList.add("hidden"));
+
+    const note = document.createElement("span");
+    note.className = "field-hint";
+    note.textContent = t("admin.unlimited_note");
+
+    form.append(daysLabel, input, give, cancel, note);
+    li.append(main, form);
     ul.appendChild(li);
   });
+}
+
+// days still covered by an admin grant (rounded up, never below 1)
+function unlimitedDaysLeft(until) {
+  return Math.max(1, Math.ceil((Number(until) - Date.now() / 1000) / 86400));
+}
+
+// days > 0 opens the quota for that many days from now, 0 takes it back
+async function setUnlimited(uid, days, btn) {
+  busy(btn, true);
+  try {
+    await api("/api/admin/unlimited", { method: "POST", body: { uid, days } });
+    toast(t(days ? "admin.toast_unlimited" : "admin.toast_unlimited_cleared"));
+    await refreshAdmin();
+  } catch (e) {
+    toast(e.message, true);
+  } finally {
+    busy(btn, false);
+  }
 }
 
 async function toggleBan(uid, banned, btn) {

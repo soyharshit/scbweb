@@ -6,6 +6,7 @@ where Telegram refuses a forward/copy and the file has to be re-uploaded.
 """
 
 import asyncio
+import io
 import logging
 import os
 import re
@@ -14,7 +15,7 @@ import shutil
 import time
 from dataclasses import dataclass, field
 
-from pyrogram.errors import FloodWait
+from pyrogram.errors import Flood, RPCError
 
 from .config import (
     DAILY_LIMIT,
@@ -44,6 +45,14 @@ class JobError(Exception):
     """User-facing job error."""
 
 
+class FloodBudgetExceeded(JobError):
+    """Telegram asks for a longer wait than one job may take.
+
+    Reported to the user straight away instead of holding the job (and the
+    screen behind it) hostage for an hour.
+    """
+
+
 @dataclass
 class Job:
     id: str
@@ -63,7 +72,8 @@ class Job:
     wait_left: int = 0        # seconds left of a Telegram rate-limit wait
     text: str | None = None
     items: list[dict] = field(default_factory=list)
-    saved_ids: list[int] = field(default_factory=list)
+    saved_ids: list[int] = field(default_factory=list)   # ids of what landed
+    saved_msgs: int = 0      # source messages that made it (a split file adds ids)
     open_url: str | None = None
     created: float = field(default_factory=time.time)
     updated: float = field(default_factory=time.time)
@@ -194,9 +204,9 @@ async def run_job(job: Job) -> None:
     except (LoginRequired, ForceSubRequired) as exc:
         job.status = "error"
         job.error = str(exc)
-    except FloodWait as fw:
+    except Flood as fw:
         job.status = "error"
-        job.error = f"Rate limited by Telegram. Try again in {fw.value} seconds."
+        job.error = _flood_message(_flood_seconds(fw) or 1)
     except asyncio.CancelledError:
         # the user pressed Stop: keep whatever was saved so far, drop the rest
         job.status = "aborted"
@@ -234,8 +244,43 @@ def abort_job(job: Job) -> None:
 # ---------------------------------------------------------------------------
 MAX_FLOOD_WAIT = 300      # never hold one call longer than this ...
 MAX_FLOOD_TOTAL = 900     # ... and never hold a whole job longer than this
+FLOOD_MARGIN = 1          # Telegram's number is a minimum, sleep a bit longer
+RPC_RETRY_DELAYS = (2, 5) # transient Telegram-side errors: seconds before retry
 CALL_TIMEOUT_SECONDS = getenv_int("CALL_TIMEOUT_SECONDS", 900)   # a dead connection
 STUCK_JOB_SECONDS = getenv_int("STUCK_JOB_SECONDS", 2700)      # 45 min without progress
+
+# (uid, call) -> the moment that account may call that method again. Learned
+# from every FloodWait, so the next call waits *before* it starts instead of
+# tripping the same limit a second after the previous wait ended.
+_FLOOD_UNTIL: dict[tuple[int, str], float] = {}
+
+
+def _flood_message(seconds: float) -> str:
+    """User-facing wording for a rate-limit wait (translated by the site)."""
+    seconds = max(1, int(seconds))
+    if seconds >= 60:
+        return f"Rate limited by Telegram. Try again in about {seconds // 60} minutes."
+    return f"Rate limited by Telegram. Try again in {seconds} seconds."
+
+
+def _flood_seconds(exc: BaseException) -> int | None:
+    """Seconds Telegram asks for, or None when this error is not a wait."""
+    if getattr(type(exc), "CODE", 0) != 420:
+        return None
+    value = getattr(exc, "value", None)
+    if not isinstance(value, int) or value <= 0:
+        return None
+    return value
+
+
+def _remember_flood(key: tuple[int, str], seconds: float) -> None:
+    until = time.time() + max(0.0, seconds)
+    if until > _FLOOD_UNTIL.get(key, 0.0):
+        _FLOOD_UNTIL[key] = until
+    if len(_FLOOD_UNTIL) > 512:
+        now = time.time()
+        for stale in [k for k, v in _FLOOD_UNTIL.items() if v <= now]:
+            _FLOOD_UNTIL.pop(stale, None)
 
 
 async def _flood_sleep(job: Job, seconds: float) -> None:
@@ -253,26 +298,58 @@ async def _flood_sleep(job: Job, seconds: float) -> None:
 
 
 async def _call(job: Job, what: str, fn):
-    """Run one Telegram API call, waiting out FloodWait errors.
+    """Run one Telegram API call, waiting out rate-limit errors.
 
     A FloodWait is not a failure: Telegram says exactly how long to hold
-    off, so the job waits, shows a live countdown and retries. An absurd
-    wait is reported to the user instead of blocking for an hour.
+    off, so the job waits, shows a live countdown and retries. Four things
+    keep that from snowballing:
+
+    * the deadline is remembered per account and per call, so the calls that
+      follow wait up front rather than all re-triggering the limit;
+    * every wait gets a safety margin, because Telegram's number is a
+      minimum and retrying at exactly that moment often fails again;
+    * a wait longer than the budget is reported at once instead of holding
+      the job for an hour;
+    * a transient Telegram-side error (HTTP 5xx) is retried with a short
+      backoff instead of failing the whole job.
     """
+    key = (job.uid, what)
     spent = 0
+    tries = 0
     while True:
+        pending = _FLOOD_UNTIL.get(key, 0.0) - time.time()
+        if pending > 0:
+            if pending > MAX_FLOOD_WAIT or spent + pending > MAX_FLOOD_TOTAL:
+                raise FloodBudgetExceeded(_flood_message(pending))
+            spent += pending
+            log.info("Holding %s for %ss (rate limit seen earlier)", what, int(pending))
+            await _flood_sleep(job, pending + FLOOD_MARGIN)
         try:
             return await asyncio.wait_for(fn(), CALL_TIMEOUT_SECONDS)
         except asyncio.TimeoutError:
             # a dropped connection would otherwise hang the job forever
             raise JobError("Telegram stopped responding. Please try again.") from None
-        except FloodWait as fw:
-            delay = int(fw.value or 1)
+        except Flood as exc:
+            delay = _flood_seconds(exc)
+            if delay is None:
+                raise     # a flood error with no duration: nothing to wait out
+            _remember_flood(key, delay + FLOOD_MARGIN)
             if delay > MAX_FLOOD_WAIT or spent + delay > MAX_FLOOD_TOTAL:
-                raise
+                raise FloodBudgetExceeded(_flood_message(delay)) from None
             spent += delay
             log.warning("FloodWait of %ss during %s, waiting", delay, what)
-            await _flood_sleep(job, delay)
+            await _flood_sleep(job, delay + FLOOD_MARGIN)
+        except RPCError as exc:
+            code = getattr(type(exc), "CODE", 0) or 0
+            if code < 500 or tries >= len(RPC_RETRY_DELAYS):
+                raise
+            delay = RPC_RETRY_DELAYS[tries]
+            tries += 1
+            log.warning("Telegram failed during %s (%s), retrying in %ss",
+                        what, exc, delay)
+            job.step = f"Retrying in {delay}s..."
+            job.touch()
+            await asyncio.sleep(delay)
 
 
 # ---------------------------------------------------------------------------
@@ -596,7 +673,15 @@ def _download_progress(index: int, count: int, start: float):
 
 
 def _upload_progress(label: str, index: int, count: int):
+    state = {"bytes": 0, "at": time.time()}
+
     async def _cb(current, total, job: Job):
+        now = time.time()
+        if now - state["at"] >= 1:
+            # show the upload's own speed, not the download's from earlier
+            job.speed = max(0, int((current - state["bytes"]) / (now - state["at"])))
+            state["bytes"] = current
+            state["at"] = now
         job.percent = min(99.9, ((index - 1) + (current / total if total else 0)) / max(count, 1) * 100)
         job.downloaded = current
         job.total = total
@@ -615,6 +700,141 @@ def _check_free_space(expected: int = 0) -> None:
             "Not enough free disk space on the server for this file.\n"
             "Please try again later or pick a smaller file."
         )
+
+
+# ---------------------------------------------------------------------------
+# Oversized files: Telegram caps one upload, so a big file goes as parts
+# ---------------------------------------------------------------------------
+# Pyrogram refuses anything above these numbers, which mirror Telegram's own
+# limits (2000 MiB without Premium, 4000 MiB with it).
+FREE_UPLOAD_BYTES = getenv_int("FREE_UPLOAD_MIB", 2000) * 1024 * 1024
+PREMIUM_UPLOAD_BYTES = getenv_int("PREMIUM_UPLOAD_MIB", 4000) * 1024 * 1024
+
+
+def _upload_limit(userbot) -> int:
+    """Bytes Telegram accepts in one upload from this account."""
+    me = getattr(userbot, "me", None)
+    return PREMIUM_UPLOAD_BYTES if getattr(me, "is_premium", False) else FREE_UPLOAD_BYTES
+
+
+def _part_name(base: str, index: int) -> str:
+    """file.7z -> file.7z.001, so `cat file.7z.* > file.7z` puts it back.
+
+    `_safe_name` keeps `base` at 150 characters, so the suffix always fits
+    inside Telegram's file name limit.
+    """
+    return f"{base}.{index:03d}"
+
+
+class _PartReader(io.IOBase):
+    """A byte range of a local file, handed to Pyrogram as its own file.
+
+    Pyrogram reads a file object with seek/tell/read and takes the upload
+    name from `.name`, so a part needs no copy on disk: the slice that fits
+    in one Telegram upload is read straight out of the already downloaded
+    file and closes after its message has been sent.
+    """
+
+    def __init__(self, path: str, offset: int, length: int, name: str):
+        super().__init__()
+        self._fh = open(path, "rb")
+        self._offset = offset
+        self._length = length
+        self._pos = 0
+        self.name = name
+
+    def seek(self, offset: int, whence: int = io.SEEK_SET) -> int:
+        if whence == io.SEEK_SET:
+            self._pos = offset
+        elif whence == io.SEEK_CUR:
+            self._pos += offset
+        elif whence == io.SEEK_END:
+            self._pos = self._length + offset
+        else:
+            raise ValueError(f"invalid whence ({whence})")
+        return self._pos
+
+    def tell(self) -> int:
+        return self._pos
+
+    def read(self, size: int = -1) -> bytes:
+        if size is None or size < 0:
+            size = self._length - self._pos
+        size = min(size, max(0, self._length - self._pos))
+        if not size:
+            return b""
+        self._fh.seek(self._offset + self._pos)
+        chunk = self._fh.read(size)
+        self._pos += len(chunk)
+        return chunk
+
+    def readable(self) -> bool:
+        return True
+
+    def close(self) -> None:
+        try:
+            self._fh.close()
+        finally:
+            super().close()
+
+
+def _part_progress(label: str, offset: int, size: int, index: int, count: int,
+                   state: dict):
+    """Progress across every part of one file, with a live upload speed."""
+    async def _cb(current, total, job: Job):
+        done = offset + current            # bytes of this file sent so far
+        now = time.time()
+        if now - state["at"] >= 1:
+            job.speed = max(0, int((done - state["bytes"]) / (now - state["at"])))
+            state["bytes"] = done
+            state["at"] = now
+        job.percent = min(
+            99.9, ((index - 1) + (done / size if size else 0)) / max(count, 1) * 100
+        )
+        job.downloaded = done
+        job.total = size
+        job.step = label
+        job.touch()
+
+    return _cb
+
+
+async def _upload_in_parts(userbot, job: Job, path: str, base: str, caption: str | None,
+                           index: int, count: int) -> tuple[list[int], int]:
+    """Upload one file as several documents, each within Telegram's cap.
+
+    The parts are read straight out of the downloaded file, so splitting
+    costs no extra disk space. Each part is its own message
+    (file.7z.001, file.7z.002, ...), which is also the only way an account
+    without Premium can deliver a file this size. Returns the sent message
+    ids and the number of parts.
+    """
+    size = os.path.getsize(path)
+    limit = _upload_limit(userbot)
+    parts = max(1, -(-size // limit))      # ceil division
+    state = {"bytes": 0, "at": time.time()}
+    sent: list[int] = []
+
+    for p in range(parts):
+        offset = p * limit
+        length = min(limit, size - offset)
+        label = f"Uploading part {p + 1}/{parts} to Saved Messages"
+        part = _PartReader(path, offset, length, _part_name(base, p + 1))
+        progress = _part_progress(label, offset, size, index, count, state)
+        try:
+            # only the first part keeps the caption: the parts go together
+            one = await _call(
+                job, "upload",
+                lambda: userbot.send_document("me", part, caption=caption if p == 0 else None,
+                                              progress=progress, progress_args=(job,)),
+            )
+        finally:
+            part.close()
+        sid = _sent_id(one)
+        if not sid:
+            raise JobError("Could not save to Saved Messages. Please try again.")
+        sent.append(sid)
+    return sent, parts
 
 
 async def _download_to_temp(userbot, job: Job, msg, index: int, count: int, job_dir) -> str:
@@ -645,6 +865,12 @@ def _sent_id(sent) -> int | None:
     return getattr(sent, "id", None) if sent else None
 
 
+def _ids(sent) -> list[int]:
+    """Message ids of one send result, as a list (possibly empty)."""
+    sid = _sent_id(sent)
+    return [sid] if sid else []
+
+
 # ---------------------------------------------------------------------------
 # Saving to Saved Messages
 # ---------------------------------------------------------------------------
@@ -653,6 +879,9 @@ async def _store_to_saved(userbot, job: Job, msgs: list) -> tuple[list[int], str
     saved: list[int] = []
     failed = 0
     oversized = False
+    split_msgs = 0
+    split_parts = 0
+    job.saved_msgs = 0        # counted per source message, not per sent part
     job_dir = JOBS_DIR / job.id
     count = len(msgs)
 
@@ -660,24 +889,32 @@ async def _store_to_saved(userbot, job: Job, msgs: list) -> tuple[list[int], str
         job.step = f"Saving to Saved Messages {i}/{count}" if count > 1 else "Saving to Saved Messages..."
         job.touch()
 
-        sid = None
+        ids: list[int] = []
         try:  # cheapest: a plain forward keeps the original formatting
-            sid = _sent_id(await _call(job, "forward",
-                                       lambda: userbot.forward_messages("me", m.chat.id, [m.id])))
+            ids = _ids(await _call(job, "forward",
+                                   lambda: userbot.forward_messages("me", m.chat.id, [m.id])))
+        except FloodBudgetExceeded:
+            raise        # the account must cool down; no point trying the rest
         except Exception:
-            sid = None
-        if sid is None:
+            ids = []
+        if not ids:
             try:  # copy behaves the same but leaves no "forwarded from" header
-                sid = _sent_id(await _call(job, "copy",
-                                           lambda: userbot.copy_message("me", m.chat.id, m.id)))
+                ids = _ids(await _call(job, "copy",
+                                       lambda: userbot.copy_message("me", m.chat.id, m.id)))
+            except FloodBudgetExceeded:
+                raise
             except Exception:
-                sid = None
-        if sid is None:
-            sid, big = await _fallback_save(userbot, job, m, i, count, job_dir)
+                ids = []
+        if not ids:
+            ids, big, parts = await _fallback_save(userbot, job, m, i, count, job_dir)
             oversized = oversized or big
+            if parts:
+                split_msgs += 1
+                split_parts = parts
 
-        if sid:
-            saved.append(sid)
+        if ids:
+            saved.extend(ids)
+            job.saved_msgs += 1
         else:
             failed += 1
             log.warning("Message %s could not be saved at all (chat=%s)", m.id,
@@ -690,11 +927,24 @@ async def _store_to_saved(userbot, job: Job, msgs: list) -> tuple[list[int], str
                     "Upgrade to Telegram Premium to save larger files.")
         else:
             note = f"{failed} item{'s' if failed != 1 else ''} could not be saved."
+    if split_msgs:
+        split_note = (
+            f"Split into {split_parts} parts; "
+            "join them in order to restore the original file."
+            if split_msgs == 1 else
+            "Split into parts; join each set of parts in order to restore the original file."
+        )
+        note = f"{note} {split_note}" if note else split_note
     return saved, note
 
 
 async def _fallback_save(userbot, job: Job, m, index: int, count: int, job_dir):
-    """Re-create the message locally and upload it to Saved Messages."""
+    """Re-create the message locally and upload it to Saved Messages.
+
+    Returns (sent message ids, over-sized, parts): `parts` is how many
+    messages one file was split into to fit Telegram's per-upload limit,
+    or 0 when it went in one piece.
+    """
     oversized = False
 
     # Text / polls can be re-sent directly -- no file involved.
@@ -711,24 +961,37 @@ async def _fallback_save(userbot, job: Job, m, index: int, count: int, job_dir):
                                  (getattr(poll, "options", None) or [])],
                     ),
                 )
-                return _sent_id(sent), False
+                return _ids(sent), False, 0
+            except FloodBudgetExceeded:
+                raise
             except Exception:
                 pass
         text = _text_content(m)
         if text:
             try:
-                return _sent_id(await _call(job, "send_message",
-                                            lambda: userbot.send_message("me", text))), False
+                return _ids(await _call(job, "send_message",
+                                        lambda: userbot.send_message("me", text))), False, 0
+            except FloodBudgetExceeded:
+                raise
             except Exception:
                 pass
-        return None, False
+        return [], False, 0
 
     path = None
     try:
         path = await _download_to_temp(userbot, job, m, index, count, job_dir)
+        caption = m.caption or None
+        base = _safe_name(_media_name(m, index))
+
+        if os.path.getsize(path) > _upload_limit(userbot):
+            # Too big for a single Telegram upload: send it as numbered parts
+            # (file.7z.001, file.7z.002, ...) read straight from this file.
+            ids, parts = await _upload_in_parts(userbot, job, path, base, caption,
+                                                index, count)
+            return ids, False, parts
+
         label = f"Uploading {index}/{count} to Saved Messages" if count > 1 else "Uploading to Saved Messages"
         progress = _upload_progress(label, index, count)
-        caption = m.caption or None
 
         if m.photo:
             send = lambda: userbot.send_photo("me", path, caption=caption,
@@ -752,13 +1015,15 @@ async def _fallback_save(userbot, job: Job, m, index: int, count: int, job_dir):
             send = lambda: userbot.send_document("me", path, caption=caption,
                                                  progress=progress, progress_args=(job,))
         sent = await _call(job, "upload", send)
-        return _sent_id(sent), False
+        return _ids(sent), False, 0
+    except FloodBudgetExceeded:
+        raise        # Telegram wants a cool-down: report it, do not bury it
     except Exception as exc:
         err = str(exc)
         if "2000" in err or "MiB" in err or "MB" in err or "megab" in err.lower():
             oversized = True
         log.warning("Re-upload failed for message %s: %s", m.id, exc)
-        return None, oversized
+        return [], oversized, 0
     finally:
         if path:
             try:
@@ -879,11 +1144,12 @@ async def _run_single(userbot, job: Job) -> None:
     await _finish_save(job, len(items))
 
     total = len(msgs)
-    if len(saved_ids) == total:
+    # `saved_ids` can hold more ids than messages: a split file lands as parts
+    if job.saved_msgs >= total:
         job.message = "Saved to your Saved Messages." if total == 1 else \
             f"Saved {total} messages to your Saved Messages."
     else:
-        job.message = f"Saved {len(saved_ids)}/{total} messages to your Saved Messages."
+        job.message = f"Saved {job.saved_msgs}/{total} messages to your Saved Messages."
     if note:
         job.message += f" {note}"
 
@@ -983,10 +1249,10 @@ async def _run_batch(userbot, job: Job) -> None:
     await db.increment_bulk_count(job.uid)
     await _finish_save(job, len(items))
 
-    if len(saved_ids) >= target:
-        job.message = f"Saved {len(saved_ids)} files to your Saved Messages."
+    if job.saved_msgs >= target:
+        job.message = f"Saved {job.saved_msgs} files to your Saved Messages."
     else:
-        job.message = f"Saved {len(saved_ids)}/{target} files to your Saved Messages."
+        job.message = f"Saved {job.saved_msgs}/{target} files to your Saved Messages."
     if note:
         job.message += f" {note}"
 
@@ -1018,6 +1284,8 @@ async def _run_multi(userbot, job: Job) -> None:
                 raise JobError("Multi-link saves need message links (https://t.me/...).")
             msg = await _resolve_message(userbot, job, parsed)
             saved_ids, items, note, _msgs = await _save_msg(userbot, job, msg, parsed)
+        except FloodBudgetExceeded:
+            raise        # rate limited: stop the whole run instead of hammering
         except JobError as exc:
             if first_error is None:
                 first_error = str(exc)
