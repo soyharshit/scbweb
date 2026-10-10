@@ -57,8 +57,9 @@ Configuration comes from `webapp/.env` (see `.env.example`) or the repo-root
   progress → open it in Telegram.
 - Phone/OTP login with 2FA, or paste an existing Pyrogram session string.
 - Supports public links, private `t.me/c/…` links, `t.me/b/…`, invite links
-  (joins the chat), albums/media groups, `?single`, text messages,
-  polls, stickers, voice, video notes.
+  (joins the chat), albums/media groups, text messages, polls, stickers,
+  voice, video notes. An album is always saved whole, even when the link
+  carries `?single` (Telegram adds that when you copy one item of it).
 - Saves only to your Telegram **Saved Messages** — no browser download; the
   server keeps nothing after the save (forward → copy → re-upload fallback,
   same as the bot).
@@ -93,6 +94,9 @@ webapp/
 ├── requirements.txt
 ├── .env.example
 ├── data/jobs/<job>/       # temp re-upload files (auto-cleaned, git-ignored)
+├── tests/
+│   ├── test_backend.py    # 217 checks, fake Mongo + fake userbot
+│   └── browser/           # puppeteer suites + the static i18n check
 └── app/
     ├── config.py          # env settings
     ├── db.py              # Mongo: users, web tokens, quota, stats

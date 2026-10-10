@@ -10,3 +10,5 @@ __pycache__/
 downloads/
 main/downloads/
 webapp/data/
+node_modules/
+/*.jpg

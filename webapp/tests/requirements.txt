@@ -1,0 +1,4 @@
+# Test-only dependencies. The application itself needs only
+# webapp/requirements.txt; starlette's TestClient drives the app over HTTP
+# in-process, which is what httpx is for.
+httpx>=0.27

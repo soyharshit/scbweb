@@ -1,0 +1,15 @@
+{
+  "name": "webapp-browser-tests",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Browser and static checks for the web client",
+  "scripts": {
+    "check:i18n": "node check_i18n.js",
+    "test:static": "node check_i18n.js",
+    "test": "node check_i18n.js && node i18n.test.js && node layout.test.js && node login.test.js && node batch.test.js && node admin.test.js"
+  },
+  "license": "UNLICENSED",
+  "dependencies": {
+    "puppeteer": "^25.12.0"
+  }
+}

@@ -41,9 +41,17 @@ def getenv_int_list(key: str, default=None) -> list[int]:
 
 
 # --- Telegram API -----------------------------------------------------------
-# Same defaults as the existing bot so both can share one .env.
-API_ID = getenv_int("API_ID", 4680197)
-API_HASH = os.getenv("API_HASH", "495b0228624028d635bd748b22985f67")
+# Read from the environment only (webapp/.env, the repo root .env, or the real
+# process env). There is deliberately no fallback value here: baking the
+# credentials into the source publishes them with the repository.
+API_ID = getenv_int("API_ID")
+API_HASH = (os.getenv("API_HASH") or "").strip() or None
+if not API_ID or not API_HASH:
+    raise RuntimeError(
+        "API_ID and API_HASH are not set. Copy webapp/.env.example to "
+        "webapp/.env (or put them in the repo root .env) with the values from "
+        "https://my.telegram.org/apps"
+    )
 
 # --- Optional / bot-side (the bot itself is NOT started by this app) --------
 FORCESUB = (os.getenv("FORCESUB") or "").strip() or None
