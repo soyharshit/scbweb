@@ -1,8 +1,8 @@
 """Configuration for the web client.
 
-Reads the same environment variables as the Telegram bot (root .env or
-webapp/.env), but does NOT require BOT_TOKEN -- the web client only needs a
-userbot (user session) to retrieve files.
+Reads the environment from the .env next to app/ (or from the real process
+environment). It does NOT require BOT_TOKEN: the web client only needs a
+userbot session, not a bot.
 """
 
 import os
@@ -11,11 +11,10 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
-BASE_DIR = Path(__file__).resolve().parent.parent  # .../webapp
-ROOT_DIR = BASE_DIR.parent  # repo root (keeps the old bot code)
+BASE_DIR = Path(__file__).resolve().parent.parent  # the repository root
 
-# Env priority: process env > webapp/.env > repo root .env
-for _p in (Path.cwd() / ".env", BASE_DIR / ".env", ROOT_DIR / ".env"):
+# Env priority: process env, then the .env next to app/, then the working dir
+for _p in (BASE_DIR / ".env", Path.cwd() / ".env"):
     if _p.is_file():
         load_dotenv(_p)
 
@@ -48,15 +47,13 @@ API_ID = getenv_int("API_ID")
 API_HASH = (os.getenv("API_HASH") or "").strip() or None
 if not API_ID or not API_HASH:
     raise RuntimeError(
-        "API_ID and API_HASH are not set. Copy webapp/.env.example to "
-        "webapp/.env (or put them in the repo root .env) with the values from "
-        "https://my.telegram.org/apps"
+        "API_ID and API_HASH are not set. Copy .env.example to .env and fill "
+        "in the values from https://my.telegram.org/apps"
     )
 
 # --- Optional / bot-side (the bot itself is NOT started by this app) --------
 FORCESUB = (os.getenv("FORCESUB") or "").strip() or None
 FORCESUB_NAME = FORCESUB.lstrip("@") if FORCESUB else None
-LOGS = getenv_int("LOGS")
 AUTH_USERS = getenv_int_list("AUTH_USERS", [7477152489])
 
 # --- Database ---------------------------------------------------------------
@@ -105,9 +102,5 @@ STATIC_DIR = BASE_DIR / "app" / "static"
 if not os.path.isdir(JOBS_DIR):
     os.makedirs(JOBS_DIR, exist_ok=True)
 
-if not API_ID or not API_HASH:
-    logging.error("Missing API_ID / API_HASH in environment.")
-    raise SystemExit(1)
-
 if not (os.getenv("MONGODB_URI") or "").strip():
-    logging.warning("MONGODB_URI not set -- using a local MongoDB at mongodb://localhost:27017")
+    logging.warning("MONGODB_URI not set, using a local MongoDB at mongodb://localhost:27017")

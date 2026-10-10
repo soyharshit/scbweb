@@ -18,8 +18,10 @@ if [ ! -x .venv/bin/python ] || [ ! -f .venv/pyvenv.cfg ]; then
 fi
 
 # --- install dependencies --------------------------------------------------
-if [ -x .venv/bin/pip ]; then
-  .venv/bin/pip install -q --disable-pip-version-check -r requirements.txt
+# python -m pip rather than the pip shim: the shim carries a hardcoded
+# shebang, so it breaks if the virtualenv is ever moved.
+if .venv/bin/python -m pip --version >/dev/null 2>&1; then
+  .venv/bin/python -m pip install -q --disable-pip-version-check -r requirements.txt
 elif command -v uv >/dev/null 2>&1; then
   # venv created by `uv venv` (ships without pip)
   uv pip install -q -p .venv/bin/python -r requirements.txt

@@ -1,17 +1,14 @@
 # Telegram File Saver
 
-Save restricted Telegram files into your own **Saved Messages**. Two clients,
-one database:
+Save restricted Telegram files into your own **Saved Messages**.
 
-| | what it is | run it |
-|---|---|---|
-| [`webapp/`](webapp/) | browser client: phone + OTP login, live progress, batch and multi-link saves, admin dashboard | `cd webapp && ./run.sh`, then http://localhost:8000 |
-| [`main/`](main/) | the original Telegram bot | `python -m main` |
+Paste a link, watch it save, open it in Telegram. Nothing is downloaded to the
+browser: the server does the work with the user's own Telegram account and
+keeps no file once the job finishes.
 
-Both talk to the same MongoDB (`DB_NAME`, default `saverestricted`) and share
-the `users` collection, so a session created in one client works in the other
-without signing in twice. Nothing else is shared: the web client never imports
-anything from `main/`.
+```
+https://188.137.182.106:8000
+```
 
 ## How a file is saved
 
@@ -24,67 +21,80 @@ anything from `main/`.
    that works: **forward**, then **copy**, then **download and re-upload** for
    content that forbids both. Files larger than the account's upload limit are
    split into numbered parts.
-4. Nothing is downloaded to the browser. Temp files exist on the server only
-   while a re-upload is in flight, and are deleted immediately after.
+4. An album is always saved whole, even when the link carries `?single`
+   (Telegram adds that when you copy one item of it).
 
-## Layout
+## Features
 
-```
-.
-├── main/                  the Telegram bot
-├── utils_bot.py           small helpers used by main/plugins/start.py
-├── pyproject.toml         bot dependencies, for uv
-├── requirements.txt       the same dependencies, for plain pip
-├── webapp/                the browser client, self-contained
-│   ├── app/               FastAPI application
-│   ├── static/            HTML, CSS and JS, no build step
-│   ├── tests/             backend and browser test suites
-│   └── run.sh             creates a venv and serves on :8000
-├── .env                   your secrets, git-ignored
-└── .env.example           template covering both clients
-```
+- Simple one-page UI in a neutral grey theme, in 8 languages with RTL support.
+- Phone and OTP login, 2FA, or a pasted session string.
+- Live progress, an abort button, and a FloodWait countdown that retries by
+  itself.
+- Batch saves (keep saving forward until N files) and multi-link saves
+  (newline separated).
+- History of recent jobs with an "Open in Telegram" button.
+- An admin dashboard: stats and charts, per-user quota, ban and unban,
+  a saving on/off switch, and two independently coloured notices.
+- Jobs never leave temp files on disk and never hang forever on a dead
+  connection.
 
-### Do not move `main/`, `utils_bot.py`, or the root packaging files
-
-`main/utils.py` loads its plugins by the relative path
-`main/plugins/<name>.py`, and the bot is started with `python -m main` from the
-repository root. Those paths are baked into how the bot runs, so the files have
-to stay exactly where they are.
-
-## Configuration
-
-Copy `.env.example` to `.env` and fill it in. The web client reads the same
-file, so `API_ID`, `API_HASH`, `MONGODB_URI`, `DB_NAME`, `FORCESUB` and
-`AUTH_USERS` are shared between the two clients. `BOT_TOKEN` is needed only by
-the bot. `webapp/.env.example` lists the web-only settings: port, cookie flags,
-daily quota, cooldown, batch limits.
-
-`API_ID` and `API_HASH` come from https://my.telegram.org/apps. They are read
-from the environment and are not baked into the source.
-
-## Running the web client
+## Running it
 
 ```bash
-cd webapp
-./run.sh
+cp .env.example .env      # fill in API_ID and API_HASH at minimum
+./run.sh                  # creates .venv, installs deps, serves on :8000
 ```
 
 Always run a single worker. Sessions and running jobs are held in memory, so
 more than one worker would lose them.
 
+`API_ID` and `API_HASH` come from https://my.telegram.org/apps. `BOT_TOKEN` is
+not needed: this app is a userbot, not a bot.
+
+## Layout
+
+```
+.
+├── app/
+│   ├── config.py          env settings
+│   ├── db.py              Mongo: users, tokens, quota, stats
+│   ├── auth.py            phone/OTP and session-string login
+│   ├── tg.py              userbot lifecycle, force-sub, joining chats
+│   ├── jobs.py            link parsing, resolution, saving to Saved Messages
+│   ├── main.py            FastAPI routes and static hosting
+│   └── static/            index.html, style.css, app.js, i18n.js, no build step
+├── tests/
+│   ├── test_backend.py    217 checks with a fake Mongo and a fake userbot
+│   └── browser/           puppeteer suites plus a static i18n check
+├── data/jobs/<job>/       temp files during a re-upload, git-ignored
+├── .env.example           every setting, with comments
+├── Dockerfile
+└── run.sh
+```
+
+## HTTP API
+
+| Method | Path                   | Description                                  |
+|--------|------------------------|----------------------------------------------|
+| POST   | `/api/login/start`     | `{phone}` sends the OTP and returns a handle |
+| POST   | `/api/login/code`      | `{handle, code}`, or asks for a password     |
+| POST   | `/api/login/password`  | `{handle, password}` for 2FA                 |
+| POST   | `/api/login/session`   | `{session}` to paste a session string        |
+| POST   | `/api/logout`          | revokes the cookie and the stored session    |
+| GET    | `/api/me`              | login state, quota, cooldown, force-sub      |
+| POST   | `/api/fetch`           | `{link}` starts a save and returns the job   |
+| GET    | `/api/jobs`            | your recent jobs                             |
+| GET    | `/api/jobs/{id}`       | progress, saved items, and an open URL       |
+| GET    | `/api/stats`           | admin stats                                   |
+
+Authentication is an `HttpOnly` `SameSite=lax` cookie backed by a random token
+stored hashed in Mongo.
+
 ## Tests
 
 ```bash
-cd webapp
 .venv/bin/python tests/test_backend.py
-
-cd tests/browser
-npm install
-node check_i18n.js
+cd tests/browser && npm install && node check_i18n.js
 ```
 
-See [`webapp/tests/README.md`](webapp/tests/README.md) for the full set.
-
-## Licence
-
-See [LICENSE](LICENSE).
+Details in [`tests/README.md`](tests/README.md).

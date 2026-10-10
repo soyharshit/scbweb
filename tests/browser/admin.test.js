@@ -5,7 +5,7 @@ const URL = "http://127.0.0.1:8000/";
 const PIN = (() => {
   const fs = require("fs");
   const path = require("path");
-  // The admin PIN lives in webapp/.env (git-ignored). The fallback keeps the
+  // The admin PIN lives in .env (git-ignored). The fallback keeps the
   // suite bootable on a fresh clone.
   const line = fs.readFileSync(path.join(__dirname, "..", "..", ".env"), "utf8")
     .split("\n").find((l) => l.startsWith("ADMIN_PIN="));

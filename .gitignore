@@ -3,12 +3,11 @@ __pycache__/
 *.pyo
 .venv/
 *.egg-info/
+node_modules/
 .env
 .env.bak*
 *.session
 *.session-journal
 downloads/
-main/downloads/
-webapp/data/
-node_modules/
+data/
 /*.jpg
