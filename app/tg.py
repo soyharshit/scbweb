@@ -18,9 +18,9 @@ _clients: dict[int, Client] = {}
 # read as this app rather than as an anonymous script (CPython/Linux), which is
 # what a user would otherwise see and distrust.
 SESSION_DEVICE = {
-    "device_model": "Telegram Saver",
+    "device_model": "Save Contents",
     "system_version": "Web",
-    "app_version": "Telegram Saver",
+    "app_version": "Save Contents",
 }
 
 

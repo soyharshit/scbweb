@@ -1,5 +1,5 @@
 /* ==========================================================================
-   Telegram Saver: shadcn-inspired neutral (grey) theme
+   Save Contents: shadcn-inspired neutral (grey) theme
    ========================================================================== */
 :root {
   color-scheme: light;
@@ -427,7 +427,6 @@ input.code-input:focus { background: var(--field); }
 .fetch-row { display: flex; gap: 9px; align-items: stretch; }
 .fetch-row .grow { flex: 1; min-width: 0; }
 .fetch-row .btn { padding-inline: 18px; }
-.hint-row { margin-top: 10px; }
 
 /* ---------- alerts ---------- */
 .alert {
@@ -535,6 +534,14 @@ input.code-input:focus { background: var(--field); }
   color: var(--muted-fg);
   overflow-wrap: anywhere;
   min-width: 0;
+}
+
+/* shown while a save is running: the job survives the tab closing */
+.bg-hint {
+  margin-top: 9px;
+  font-size: .78rem;
+  line-height: 1.5;
+  color: var(--subtle-fg);
 }
 
 /* ---------- result ---------- */
@@ -763,14 +770,14 @@ input.code-input:focus { background: var(--field); }
 }
 /* the button to tap in Telegram is the one that stands out */
 .tg-notice-ok {
-  color: #2563eb;
-  background: #eff6ff;
-  border: 1px solid #bfdbfe;
+  color: #9333ea;
+  background: #faf5ff;
+  border: 1px solid #e9d5ff;
   animation: noticeGlow 2.6s var(--ease) infinite;
 }
 @keyframes noticeGlow {
-  0%, 100% { box-shadow: 0 0 0 0 rgba(37, 99, 235, .28); }
-  50%      { box-shadow: 0 0 0 5px rgba(37, 99, 235, 0); }
+  0%, 100% { box-shadow: 0 0 0 0 rgba(147, 51, 234, .28); }
+  50%      { box-shadow: 0 0 0 5px rgba(147, 51, 234, 0); }
 }
 
 /* ---------- skeleton loaders ---------- */
@@ -1052,9 +1059,9 @@ html[data-theme="dark"] .modal-icon.neutral {
 }
 html[data-theme="dark"] .modal-icon.info { background: rgba(96, 165, 250, .14); color: #60a5fa; }
 html[data-theme="dark"] .tg-notice-ok {
-  background: rgba(96, 165, 250, .14);
-  border-color: rgba(96, 165, 250, .34);
-  color: #93c5fd;
+  background: rgba(192, 132, 252, .14);
+  border-color: rgba(192, 132, 252, .34);
+  color: #d8b4fe;
 }
 html[data-theme="dark"] .sk {
   background-image: linear-gradient(90deg, #202026 25%, #2a2a31 50%, #202026 75%);

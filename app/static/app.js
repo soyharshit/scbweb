@@ -1,4 +1,4 @@
-/* Telegram Saver - web client (save to Saved Messages, no browser downloads) */
+/* Save Contents - web client (save to Saved Messages, no browser downloads) */
 "use strict";
 
 const $ = (id) => document.getElementById(id);
@@ -1136,6 +1136,7 @@ function renderJob(job) {
 
   const running = job.status === "running" || job.status === "queued";
   $("abortBtn").classList.toggle("hidden", !running);
+  $("jobBgHint").classList.toggle("hidden", !running);
   const pct = job.percent || 0;
   $("jobPct").textContent = job.status === "done" ? t("saved_badge") : `${Math.round(pct)}%`;
   $("jobBar").style.width = `${pct}%`;

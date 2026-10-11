@@ -426,7 +426,7 @@ with TestClient(app, raise_server_exceptions=False) as client:
 
     # --- static & auth ---
     r = client.get("/")
-    check("index served", r.status_code == 200 and "Telegram Saver" in r.text)
+    check("index served", r.status_code == 200 and "Save Contents" in r.text)
     check("no download checkbox", "saveToggle" not in r.text)
     check("js served", client.get("/app.js").status_code == 200)
     check("css served", client.get("/style.css").status_code == 200)

@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="robots" content="noindex">
-  <title>Telegram Saver</title>
+  <title>Save Contents</title>
   <link rel="icon" href="data:,">
   <script>
     // apply the stored (or system) theme before first paint: no flash of the wrong colours
@@ -20,18 +20,18 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/style.css?v=16">
+  <link rel="stylesheet" href="/style.css?v=18">
 </head>
 <body>
   <header class="topbar">
     <div class="brand">
       <span class="brand-mark" aria-hidden="true">
         <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/>
+          <circle cx="7.5" cy="15.5" r="5.5"/><path d="m21 2-9.6 9.6"/><path d="m15.5 7.5 3 3L22 7l-3-3"/>
         </svg>
       </span>
       <div class="brand-text">
-        <strong>Telegram Saver</strong>
+        <strong>Save Contents</strong>
         <small data-i18n="tagline">Save restricted content to your Saved&nbsp;Messages</small>
       </div>
     </div>
@@ -177,10 +177,6 @@
             </button>
           </div>
 
-          <div class="hint-row">
-            <span class="muted small" data-i18n-html="save.hint">Public links · private <code>t.me/c/…</code> · invite links · albums</span>
-          </div>
-
           <p id="enterHint" class="field-hint" data-i18n="link.enter_hint">Press Enter for a new line. Ctrl+Enter sends the save.</p>
 
           <div class="opt-row">
@@ -224,6 +220,8 @@
             <span id="jobStep" data-i18n="step.waiting">Waiting…</span>
             <span id="jobStats" class="muted small"></span>
           </div>
+
+          <p id="jobBgHint" class="bg-hint hidden" data-i18n="save.bg_hint">You can close this, your saving runs in the background, and you can open it again to check the progress.</p>
 
           <div id="jobError" class="alert alert-error fade-in hidden"></div>
 
@@ -481,7 +479,7 @@
       <!-- replica of the alert Telegram pushes, so it is recognised at once -->
       <div class="tg-notice" aria-hidden="true">
         <div class="tg-notice-title" data-i18n="sec.preview_title">New login to your account</div>
-        <div class="tg-notice-meta">Telegram Saver</div>
+        <div class="tg-notice-meta">Save Contents</div>
         <div class="tg-notice-meta tg-notice-when"><span id="secWhen">Now</span></div>
         <div class="tg-notice-actions">
           <span class="tg-notice-btn" data-i18n="sec.preview_sessions">Check Active Sessions</span>
@@ -498,7 +496,7 @@
   </div>
 
   <div id="toast" class="toast hidden"></div>
-  <script src="/i18n.js?v=16"></script>
-  <script src="/app.js?v=16"></script>
+  <script src="/i18n.js?v=18"></script>
+  <script src="/app.js?v=18"></script>
 </body>
 </html>
